@@ -13,4 +13,5 @@ interface SyncEngine {
     suspend fun listConflicts(): List<String>
     fun startAutoSync()
     fun stopAutoSync()
+    fun startFileObserver()
 }

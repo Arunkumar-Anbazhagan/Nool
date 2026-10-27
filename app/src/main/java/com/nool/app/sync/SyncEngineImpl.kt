@@ -67,9 +67,12 @@ class SyncEngineImpl(
                     }
                 }
         }
+    }
 
-        // Start FileObserver on the vault
-        startVaultFileObserver()
+    override fun startFileObserver() {
+        scope.launch {
+            startVaultFileObserver()
+        }
     }
 
     private fun addLog(level: SyncLogEntry.LogLevel, message: String, details: String? = null) {

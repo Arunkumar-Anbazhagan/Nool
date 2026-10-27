@@ -72,16 +72,26 @@ class GitViewModel(
     }
 
     fun loadSettings() {
-        _uiState.update {
-            it.copy(
-                remoteUrl = credentialsStore.getRemoteUrl(),
-                remoteName = credentialsStore.getRemoteName(),
-                targetSubfolder = credentialsStore.getRepoSubfolder(),
-                authorName = credentialsStore.getAuthorName(),
-                authorEmail = credentialsStore.getAuthorEmail(),
-                authType = credentialsStore.getAuthType(),
-                sshPublicKey = credentialsStore.getSshPublicKey().orEmpty()
-            )
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val remoteUrl = credentialsStore.getRemoteUrl()
+            val remoteName = credentialsStore.getRemoteName()
+            val targetSubfolder = credentialsStore.getRepoSubfolder()
+            val authorName = credentialsStore.getAuthorName()
+            val authorEmail = credentialsStore.getAuthorEmail()
+            val authType = credentialsStore.getAuthType()
+            val sshPublicKey = credentialsStore.getSshPublicKey().orEmpty()
+
+            _uiState.update {
+                it.copy(
+                    remoteUrl = remoteUrl,
+                    remoteName = remoteName,
+                    targetSubfolder = targetSubfolder,
+                    authorName = authorName,
+                    authorEmail = authorEmail,
+                    authType = authType,
+                    sshPublicKey = sshPublicKey
+                )
+            }
         }
     }
 

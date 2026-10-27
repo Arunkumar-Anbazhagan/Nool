@@ -106,6 +106,52 @@ class IndexManager(
         val content: String
     )
 
+    suspend fun syncIndex(): Int = withContext(Dispatchers.IO) {
+        if (!vaultRoot.exists()) return@withContext 0
+        _isIndexing.value = true
+        try {
+            val allDbNotes = indexDao.getAllNotes().associateBy { it.relativePath }
+            val diskFiles = mutableListOf<File>()
+
+            fun scanDir(dir: File) {
+                val children = dir.listFiles() ?: return
+                for (child in children) {
+                    if (child.name.startsWith(".") || child.name == "attachments") continue
+                    if (child.isDirectory) {
+                        scanDir(child)
+                    } else if (child.isFile && child.name.endsWith(".md", ignoreCase = true)) {
+                        diskFiles.add(child)
+                    }
+                }
+            }
+            scanDir(vaultRoot)
+
+            val diskPaths = mutableSetOf<String>()
+            var updatedCount = 0
+
+            for (file in diskFiles) {
+                val relative = file.relativeTo(vaultRoot).path.replace('\\', '/')
+                diskPaths.add(relative)
+                val existing = allDbNotes[relative]
+                if (existing == null || existing.lastModified != file.lastModified() || existing.size != file.length()) {
+                    indexFile(file)
+                    updatedCount++
+                }
+            }
+
+            for (dbNote in allDbNotes.values) {
+                if (!diskPaths.contains(dbNote.relativePath)) {
+                    removeFile(dbNote.relativePath)
+                    updatedCount++
+                }
+            }
+
+            updatedCount
+        } finally {
+            _isIndexing.value = false
+        }
+    }
+
     suspend fun rebuildIndex(): Int = withContext(Dispatchers.IO) {
         _isIndexing.value = true
         try {

@@ -57,7 +57,7 @@ class NotesViewModel(
     initialFolder: String = ""
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(NotesUiState(currentFolder = initialFolder))
+    private val _uiState = MutableStateFlow(NotesUiState(currentFolder = initialFolder, isLoading = true))
     val uiState: StateFlow<NotesUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<NotesUiEvent>()

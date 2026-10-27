@@ -20,21 +20,13 @@ class FileManager(
     val vaultRoot: File = customVaultDir ?: File(
         requireNotNull(context) { "Context must be provided if customVaultDir is not specified." }.filesDir,
         "vault"
-    ).apply {
-        if (!exists()) {
-            mkdirs()
-        }
-    }
+    )
 
     val trashDir: File = File(vaultRoot, ".trash")
     val attachmentsDir: File = File(vaultRoot, "attachments")
     private val trashManifestFile: File get() = File(trashDir, "manifest.json")
 
-    init {
-        ensureVaultInitialized()
-    }
-
-    private fun ensureVaultInitialized() {
+    suspend fun ensureVaultInitialized(): Unit = withContext(Dispatchers.IO) {
         if (!vaultRoot.exists()) {
             vaultRoot.mkdirs()
         }
@@ -76,6 +68,7 @@ Enjoy writing!
     }
 
     suspend fun listItems(folderRelativePath: String): List<VaultItem> = withContext(Dispatchers.IO) {
+        ensureVaultInitialized()
         val folder = resolveSafe(folderRelativePath)
         if (!folder.exists() || !folder.isDirectory) {
             return@withContext emptyList()
