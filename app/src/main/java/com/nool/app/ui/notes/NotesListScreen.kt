@@ -93,7 +93,7 @@ fun NotesListScreen(
     onNavigateToFolder: (folderPath: String) -> Unit,
     onNavigateUp: () -> Unit,
     onNavigateToTrash: () -> Unit,
-    onNavigateToSearch: () -> Unit,
+    onNavigateToSearch: (query: String) -> Unit = {},
     onNavigateToSettings: () -> Unit,
     onNavigateToGraph: () -> Unit = {},
     onNavigateToGitSettings: () -> Unit = {},
@@ -106,6 +106,7 @@ fun NotesListScreen(
     val allVaultNotes by viewModel.allVaultNotes.collectAsState()
     val vaultTags by viewModel.vaultTags.collectAsState()
     val folderTree by viewModel.folderTree.collectAsState()
+    val savedSearches by viewModel.savedSearches.collectAsState()
     val gitUiState by gitViewModel.uiState.collectAsState()
     val gitSyncStatus by gitViewModel.syncStatus.collectAsState()
     val gitSyncLogs by gitViewModel.syncLogs.collectAsState()
@@ -126,7 +127,7 @@ fun NotesListScreen(
                     onNavigateToNote(event.relativePath)
                 }
                 is NotesUiEvent.OpenSearch -> {
-                    onNavigateToSearch()
+                    onNavigateToSearch("")
                 }
                 is NotesUiEvent.OpenSettings -> {
                     onNavigateToSettings()
@@ -150,7 +151,7 @@ fun NotesListScreen(
                     },
                     onSelectTag = { tag ->
                         scope.launch { drawerState.close() }
-                        onNavigateToSearch()
+                        onNavigateToSearch("tag:$tag")
                     },
                     onCreateNote = {
                         scope.launch { drawerState.close() }
@@ -163,6 +164,14 @@ fun NotesListScreen(
                     onOpenDailyNote = {
                         scope.launch { drawerState.close() }
                         viewModel.openOrCreateDailyNote()
+                    },
+                    savedSearches = savedSearches,
+                    onSelectSavedSearch = { query ->
+                        scope.launch { drawerState.close() }
+                        onNavigateToSearch(query)
+                    },
+                    onDeleteSavedSearch = { id ->
+                        viewModel.deleteSavedSearch(id)
                     },
                     onNavigateToTrash = {
                         scope.launch { drawerState.close() }
@@ -252,7 +261,7 @@ fun NotesListScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        IconButton(onClick = onNavigateToSearch) {
+                        IconButton(onClick = { onNavigateToSearch("") }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search"
@@ -295,7 +304,7 @@ fun NotesListScreen(
                     onItemSelected = { item ->
                         when (item.id) {
                             "switcher" -> showQuickSwitcher = true
-                            "search" -> onNavigateToSearch()
+                            "search" -> onNavigateToSearch("")
                             "graph" -> onNavigateToGraph()
                             "settings" -> onNavigateToSettings()
                         }

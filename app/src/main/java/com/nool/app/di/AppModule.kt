@@ -54,7 +54,7 @@ val appModule = module {
     viewModel { (folder: String) -> NotesViewModel(get(), get(), folder, get()) }
     viewModel { (notePath: String) -> NoteEditViewModel(get(), notePath, get()) }
     viewModel { TrashViewModel(get()) }
-    viewModel { (initialTag: String?) -> SearchViewModel(get(), initialTag) }
+    viewModel { (initialTag: String?, initialQuery: String?) -> SearchViewModel(get(), get(), initialTag, initialQuery) }
     viewModel { SettingsViewModel(get(), get()) }
     viewModel { GitViewModel(get(), get(), get()) }
     viewModel { (initialNotePath: String?) -> com.nool.app.ui.graph.GraphViewModel(get(), initialNotePath) }

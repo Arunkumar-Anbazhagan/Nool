@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.nool.app.data.index.NoteEntity
 import com.nool.app.data.index.SearchScope
 import com.nool.app.domain.repository.VaultRepository
+import com.nool.app.settings.SavedSearch
+import com.nool.app.settings.SettingsRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,19 +25,27 @@ data class SearchUiState(
     val results: List<NoteEntity> = emptyList(),
     val availableTags: Map<String, Int> = emptyMap(),
     val availableFolders: List<String> = emptyList(),
+    val savedSearches: List<SavedSearch> = emptyList(),
     val isLoading: Boolean = false
 )
 
 @OptIn(FlowPreview::class)
 class SearchViewModel(
     private val repository: VaultRepository,
-    initialTag: String? = null
+    private val settingsRepository: SettingsRepository? = null,
+    initialTag: String? = null,
+    initialQuery: String? = null
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SearchUiState(selectedTag = initialTag))
+    private val _uiState = MutableStateFlow(
+        SearchUiState(
+            query = initialQuery ?: "",
+            selectedTag = initialTag
+        )
+    )
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    private val queryInputFlow = MutableStateFlow("")
+    private val queryInputFlow = MutableStateFlow(initialQuery ?: "")
 
     init {
         loadMetadata()
@@ -53,6 +63,14 @@ class SearchViewModel(
             repository.vaultUpdates.collect {
                 loadMetadata()
                 executeSearch()
+            }
+        }
+
+        if (settingsRepository != null) {
+            viewModelScope.launch {
+                settingsRepository.savedSearches.collect { saved ->
+                    _uiState.update { it.copy(savedSearches = saved) }
+                }
             }
         }
     }
@@ -88,6 +106,25 @@ class SearchViewModel(
     fun selectScope(scope: SearchScope) {
         _uiState.update { it.copy(selectedScope = scope) }
         executeSearch()
+    }
+
+    fun saveSearch(name: String) {
+        val q = _uiState.value.query
+        if (q.isBlank() || settingsRepository == null) return
+        viewModelScope.launch {
+            settingsRepository.saveSearch(name, q)
+        }
+    }
+
+    fun deleteSavedSearch(id: String) {
+        if (settingsRepository == null) return
+        viewModelScope.launch {
+            settingsRepository.deleteSavedSearch(id)
+        }
+    }
+
+    fun applySavedSearch(saved: SavedSearch) {
+        onQueryChange(saved.query)
     }
 
     fun clearFilters() {

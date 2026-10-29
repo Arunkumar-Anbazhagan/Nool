@@ -372,8 +372,11 @@ class IndexManager(
         scope: SearchScope = SearchScope.ALL
     ): List<NoteEntity> = withContext(Dispatchers.IO) {
         val trimmedQuery = query.trim()
+        val parsedQuery = SearchQueryParser.parse(trimmedQuery)
 
-        val rawResults = if (trimmedQuery.isNotEmpty()) {
+        val rawResults = if (parsedQuery.hasOperators) {
+            indexDao.getAllNotes()
+        } else if (trimmedQuery.isNotEmpty()) {
             val ftsQuery = sanitizeFtsQuery(trimmedQuery)
             try {
                 indexDao.searchFts(ftsQuery)
@@ -400,7 +403,9 @@ class IndexManager(
                 SearchScope.ARCHIVED -> note.isArchived
             }
 
-            matchesFolder && matchesTag && matchesType && matchesScope
+            val matchesOperators = SearchQueryParser.matches(note, parsedQuery)
+
+            matchesFolder && matchesTag && matchesType && matchesScope && matchesOperators
         }
     }
 

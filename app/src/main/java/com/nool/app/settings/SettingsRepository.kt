@@ -28,6 +28,12 @@ enum class SortOption(val label: String) {
     TITLE_DESC("Title (Z–A)")
 }
 
+data class SavedSearch(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val name: String,
+    val query: String
+)
+
 class SettingsRepository(
     private val context: Context? = null,
     customDataStore: DataStore<Preferences>? = null
@@ -43,6 +49,7 @@ class SettingsRepository(
         private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black")
         private val KEY_TEMPLATES_FOLDER = stringPreferencesKey("templates_folder")
         private val KEY_DAILY_NOTES_FOLDER = stringPreferencesKey("daily_notes_folder")
+        private val KEY_SAVED_SEARCHES = stringPreferencesKey("saved_searches")
     }
 
     val themeMode: Flow<ThemeMode> = dataStore?.data?.map { prefs ->
@@ -78,6 +85,68 @@ class SettingsRepository(
     val dailyNotesFolder: Flow<String> = dataStore?.data?.map { prefs ->
         prefs[KEY_DAILY_NOTES_FOLDER] ?: "Daily Notes"
     } ?: kotlinx.coroutines.flow.flowOf("Daily Notes")
+
+    val savedSearches: Flow<List<SavedSearch>> = dataStore?.data?.map { prefs ->
+        val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
+        deserializeSavedSearches(raw)
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    suspend fun saveSearch(name: String, query: String): SavedSearch {
+        val newSearch = SavedSearch(name = name.trim(), query = query.trim())
+        dataStore?.edit { prefs ->
+            val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
+            val current = deserializeSavedSearches(raw).toMutableList()
+            val existingIndex = current.indexOfFirst { it.name.equals(name.trim(), ignoreCase = true) }
+            if (existingIndex >= 0) {
+                current[existingIndex] = newSearch
+            } else {
+                current.add(newSearch)
+            }
+            prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
+        }
+        return newSearch
+    }
+
+    suspend fun deleteSavedSearch(id: String) {
+        dataStore?.edit { prefs ->
+            val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
+            val current = deserializeSavedSearches(raw).filter { it.id != id }
+            prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
+        }
+    }
+
+    private fun serializeSavedSearches(searches: List<SavedSearch>): String {
+        val arr = org.json.JSONArray()
+        for (s in searches) {
+            val obj = org.json.JSONObject()
+            obj.put("id", s.id)
+            obj.put("name", s.name)
+            obj.put("query", s.query)
+            arr.put(obj)
+        }
+        return arr.toString()
+    }
+
+    private fun deserializeSavedSearches(raw: String): List<SavedSearch> {
+        if (raw.isBlank()) return emptyList()
+        return try {
+            val arr = org.json.JSONArray(raw)
+            val list = mutableListOf<SavedSearch>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                list.add(
+                    SavedSearch(
+                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                        name = obj.optString("name", "Search"),
+                        query = obj.optString("query", "")
+                    )
+                )
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore?.edit { it[KEY_THEME_MODE] = mode.name }

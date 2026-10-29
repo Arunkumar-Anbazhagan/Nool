@@ -25,10 +25,11 @@ sealed class Screen(val route: String) {
 
     data object Trash : Screen("trash")
 
-    data object Search : Screen("search?tag={tag}") {
-        fun createRoute(initialTag: String = ""): String {
-            val encoded = URLEncoder.encode(initialTag, StandardCharsets.UTF_8.toString())
-            return "search?tag=$encoded"
+    data object Search : Screen("search?tag={tag}&query={query}") {
+        fun createRoute(initialTag: String = "", initialQuery: String = ""): String {
+            val encodedTag = URLEncoder.encode(initialTag, StandardCharsets.UTF_8.toString())
+            val encodedQuery = URLEncoder.encode(initialQuery, StandardCharsets.UTF_8.toString())
+            return "search?tag=$encodedTag&query=$encodedQuery"
         }
     }
 

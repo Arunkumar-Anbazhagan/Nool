@@ -73,6 +73,9 @@ class NotesViewModel(
     private val _folderTree = MutableStateFlow<TreeNode>(TreeNode("Vault", "", true))
     val folderTree: StateFlow<TreeNode> = _folderTree.asStateFlow()
 
+    private val _savedSearches = MutableStateFlow<List<com.nool.app.settings.SavedSearch>>(emptyList())
+    val savedSearches: StateFlow<List<com.nool.app.settings.SavedSearch>> = _savedSearches.asStateFlow()
+
     init {
         setFolder(initialFolder)
         loadSidebarData()
@@ -93,6 +96,17 @@ class NotesViewModel(
                 _uiState.update { it.copy(showArchived = show) }
                 loadCurrentFolder()
             }
+        }
+        viewModelScope.launch {
+            settingsRepository.savedSearches.collect { searches ->
+                _savedSearches.value = searches
+            }
+        }
+    }
+
+    fun deleteSavedSearch(id: String) {
+        viewModelScope.launch {
+            settingsRepository.deleteSavedSearch(id)
         }
     }
 

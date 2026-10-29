@@ -68,8 +68,8 @@ fun NoolNavGraph(
                 onNavigateToTrash = {
                     navController.navigate(Screen.Trash.route)
                 },
-                onNavigateToSearch = {
-                    navController.navigate(Screen.Search.createRoute(""))
+                onNavigateToSearch = { query ->
+                    navController.navigate(Screen.Search.createRoute(initialQuery = query))
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
@@ -163,13 +163,19 @@ fun NoolNavGraph(
                 navArgument("tag") {
                     type = NavType.StringType
                     defaultValue = ""
+                },
+                navArgument("query") {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { backStackEntry ->
             val tag = backStackEntry.arguments?.getString("tag") ?: ""
             val decodedTag = if (tag.isNotEmpty()) Screen.NoteDetail.decodePath(tag) else null
+            val query = backStackEntry.arguments?.getString("query") ?: ""
+            val decodedQuery = if (query.isNotEmpty()) Screen.NoteDetail.decodePath(query) else null
             val viewModel: SearchViewModel = koinViewModel(
-                parameters = { parametersOf(decodedTag) }
+                parameters = { parametersOf(decodedTag, decodedQuery) }
             )
 
             SearchScreen(
