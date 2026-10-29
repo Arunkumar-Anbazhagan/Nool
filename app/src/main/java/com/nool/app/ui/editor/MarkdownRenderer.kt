@@ -3,6 +3,7 @@ package com.nool.app.ui.editor
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,16 +22,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.nool.app.ui.editor.callout.CalloutHelper
 import com.nool.app.ui.editor.callout.CalloutInfo
+import com.nool.app.ui.editor.embed.NoteEmbedHelper
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +58,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -93,6 +98,9 @@ fun MarkdownRenderer(
     markdown: String,
     vaultRoot: File,
     modifier: Modifier = Modifier,
+    currentNotePath: String = "",
+    recursionDepth: Int = 0,
+    visitedPaths: Set<String> = if (currentNotePath.isNotEmpty()) setOf(currentNotePath) else emptySet(),
     onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)? = null,
     onLinkClick: ((url: String) -> Unit)? = null,
     onWikiLinkClick: ((target: String) -> Unit)? = null
@@ -116,6 +124,8 @@ fun MarkdownRenderer(
                 node = child,
                 vaultRoot = vaultRoot,
                 markdown = markdown,
+                recursionDepth = recursionDepth,
+                visitedPaths = visitedPaths,
                 onToggleTask = onToggleTask,
                 onLinkClick = onLinkClick,
                 onWikiLinkClick = onWikiLinkClick
@@ -130,6 +140,8 @@ private fun RenderBlockNode(
     node: Node,
     vaultRoot: File,
     markdown: String,
+    recursionDepth: Int,
+    visitedPaths: Set<String>,
     onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
     onLinkClick: ((url: String) -> Unit)?,
     onWikiLinkClick: ((target: String) -> Unit)?
@@ -139,10 +151,10 @@ private fun RenderBlockNode(
             RenderHeading(node, onLinkClick, onWikiLinkClick)
         }
         is Paragraph -> {
-            RenderParagraph(node, vaultRoot, onToggleTask, markdown, onLinkClick, onWikiLinkClick)
+            RenderParagraph(node, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
         }
         is BlockQuote -> {
-            RenderBlockQuote(node, vaultRoot, markdown, onToggleTask, onLinkClick, onWikiLinkClick)
+            RenderBlockQuote(node, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
         }
         is FencedCodeBlock -> {
             RenderCodeBlock(node.literal, node.info)
@@ -235,8 +247,10 @@ private fun RenderHeading(
 private fun RenderParagraph(
     paragraph: Paragraph,
     vaultRoot: File,
-    onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
     markdown: String,
+    recursionDepth: Int,
+    visitedPaths: Set<String>,
+    onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
     onLinkClick: ((url: String) -> Unit)?,
     onWikiLinkClick: ((target: String) -> Unit)?
 ) {
@@ -267,42 +281,15 @@ private fun RenderParagraph(
             }
             return
         } else {
-            val noteTarget = target.substringBefore("#").substringBefore("|").trim()
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { onWikiLinkClick?.invoke(noteTarget) }
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Description,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = noteTarget,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Embedded note • Tap to open",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                }
-            }
+            RenderNoteEmbed(
+                target = target,
+                vaultRoot = vaultRoot,
+                recursionDepth = recursionDepth,
+                visitedPaths = visitedPaths,
+                onToggleTask = onToggleTask,
+                onLinkClick = onLinkClick,
+                onWikiLinkClick = onWikiLinkClick
+            )
             return
         }
     }
@@ -328,10 +315,205 @@ private fun RenderParagraph(
 }
 
 @Composable
+private fun RenderNoteEmbed(
+    target: String,
+    vaultRoot: File,
+    recursionDepth: Int,
+    visitedPaths: Set<String>,
+    onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
+    onLinkClick: ((url: String) -> Unit)?,
+    onWikiLinkClick: ((target: String) -> Unit)?
+) {
+    val noteTarget = target.substringBefore("#").substringBefore("|").trim()
+    val headingTarget = if (target.contains("#")) target.substringAfter("#").substringBefore("|").trim() else null
+
+    // 1. Cycle / Depth limit check
+    if (recursionDepth >= NoteEmbedHelper.MAX_RECURSION_DEPTH) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Embed depth limit reached for '$noteTarget'",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+        return
+    }
+
+    val noteFile = remember(target, vaultRoot) {
+        NoteEmbedHelper.resolveNoteFile(vaultRoot, noteTarget)
+    }
+
+    // 2. Note not found
+    if (noteFile == null || !noteFile.exists()) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { onWikiLinkClick?.invoke(noteTarget) }
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (headingTarget != null) "$noteTarget #$headingTarget" else noteTarget,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Embedded note does not exist • Tap to create",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    // 3. Cycle detection
+    val canonicalPath = noteFile.relativeTo(vaultRoot).path.replace('\\', '/')
+    if (visitedPaths.contains(canonicalPath)) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Cycle detected in note embed: '$canonicalPath'",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+        return
+    }
+
+    // 4. Extract content and render inline
+    val rawContent = remember(noteFile) {
+        try { noteFile.readText() } catch (e: Exception) { "" }
+    }
+
+    val embedMarkdown = remember(rawContent, headingTarget) {
+        if (headingTarget.isNullOrBlank()) {
+            rawContent
+        } else {
+            NoteEmbedHelper.extractHeadingSection(rawContent, headingTarget)
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Embed Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onWikiLinkClick?.invoke(noteTarget) }
+                    .padding(bottom = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (headingTarget != null) "$noteTarget > $headingTarget" else noteTarget,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = "Open embedded note",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Inline markdown rendering of embedded note content
+            MarkdownRenderer(
+                markdown = embedMarkdown,
+                vaultRoot = vaultRoot,
+                modifier = Modifier.fillMaxWidth(),
+                currentNotePath = canonicalPath,
+                recursionDepth = recursionDepth + 1,
+                visitedPaths = visitedPaths + canonicalPath,
+                onToggleTask = onToggleTask,
+                onLinkClick = onLinkClick,
+                onWikiLinkClick = onWikiLinkClick
+            )
+        }
+    }
+}
+
+@Composable
 private fun RenderBlockQuote(
     blockQuote: BlockQuote,
     vaultRoot: File,
     markdown: String,
+    recursionDepth: Int,
+    visitedPaths: Set<String>,
     onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
     onLinkClick: ((url: String) -> Unit)?,
     onWikiLinkClick: ((target: String) -> Unit)?
@@ -365,6 +547,8 @@ private fun RenderBlockQuote(
             firstParagraphRemainingText = firstParagraphRestText,
             vaultRoot = vaultRoot,
             markdown = markdown,
+            recursionDepth = recursionDepth,
+            visitedPaths = visitedPaths,
             onToggleTask = onToggleTask,
             onLinkClick = onLinkClick,
             onWikiLinkClick = onWikiLinkClick
@@ -393,7 +577,7 @@ private fun RenderBlockQuote(
         ) {
             var child: Node? = blockQuote.firstChild
             while (child != null) {
-                RenderBlockNode(child, vaultRoot, markdown, onToggleTask, onLinkClick, onWikiLinkClick)
+                RenderBlockNode(child, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
                 child = child.next
             }
         }
@@ -407,6 +591,8 @@ private fun RenderCallout(
     firstParagraphRemainingText: String?,
     vaultRoot: File,
     markdown: String,
+    recursionDepth: Int,
+    visitedPaths: Set<String>,
     onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
     onLinkClick: ((url: String) -> Unit)?,
     onWikiLinkClick: ((target: String) -> Unit)?
@@ -483,7 +669,7 @@ private fun RenderCallout(
                         // Render subsequent block nodes in the callout
                         var nextBlock = firstParagraph.next
                         while (nextBlock != null) {
-                            RenderBlockNode(nextBlock, vaultRoot, markdown, onToggleTask, onLinkClick, onWikiLinkClick)
+                            RenderBlockNode(nextBlock, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
                             nextBlock = nextBlock.next
                         }
                     }

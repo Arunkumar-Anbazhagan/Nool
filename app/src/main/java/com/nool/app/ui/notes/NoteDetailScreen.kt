@@ -376,6 +376,7 @@ fun NoteDetailScreen(
                     MarkdownRenderer(
                         markdown = uiState.content,
                         vaultRoot = viewModel.getVaultRoot(),
+                        currentNotePath = uiState.relativePath,
                         onToggleTask = { lineIndex, isChecked ->
                             viewModel.toggleTask(lineIndex, isChecked)
                         },
