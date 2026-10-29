@@ -33,6 +33,12 @@ class SettingsViewModel(
     val fontSize: StateFlow<Int> = settingsRepository.fontSize
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
 
+    val templatesFolder: StateFlow<String> = settingsRepository.templatesFolder
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Templates")
+
+    val dailyNotesFolder: StateFlow<String> = settingsRepository.dailyNotesFolder
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Daily Notes")
+
     private val _isRebuildingIndex = MutableStateFlow(false)
     val isRebuildingIndex: StateFlow<Boolean> = _isRebuildingIndex.asStateFlow()
 
@@ -54,6 +60,18 @@ class SettingsViewModel(
     fun setFontSize(size: Int) {
         viewModelScope.launch {
             settingsRepository.setFontSize(size)
+        }
+    }
+
+    fun setTemplatesFolder(folder: String) {
+        viewModelScope.launch {
+            settingsRepository.setTemplatesFolder(folder)
+        }
+    }
+
+    fun setDailyNotesFolder(folder: String) {
+        viewModelScope.launch {
+            settingsRepository.setDailyNotesFolder(folder)
         }
     }
 

@@ -54,7 +54,8 @@ sealed interface NotesUiEvent {
 class NotesViewModel(
     private val repository: VaultRepository,
     private val settingsRepository: SettingsRepository,
-    initialFolder: String = ""
+    initialFolder: String = "",
+    private val templateManager: com.nool.app.data.templates.TemplateManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotesUiState(currentFolder = initialFolder, isLoading = true))
@@ -91,6 +92,27 @@ class NotesViewModel(
             settingsRepository.showArchived.collect { show ->
                 _uiState.update { it.copy(showArchived = show) }
                 loadCurrentFolder()
+            }
+        }
+    }
+
+    fun openOrCreateDailyNote() {
+        viewModelScope.launch {
+            if (templateManager != null) {
+                templateManager.getOrCreateDailyNote()
+                    .onSuccess { path ->
+                        _events.emit(NotesUiEvent.OpenNote(path))
+                    }
+                    .onFailure { error ->
+                        _events.emit(NotesUiEvent.ShowMessage("Failed to open daily note: ${error.message}"))
+                    }
+            } else {
+                val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val today = dateFormat.format(java.util.Date())
+                val note = repository.createNote("", today, "# $today\n\n").getOrNull()
+                if (note != null) {
+                    _events.emit(NotesUiEvent.OpenNote(note.relativePath))
+                }
             }
         }
     }

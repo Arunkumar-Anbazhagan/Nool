@@ -67,8 +67,39 @@ sealed interface NoteEditEvent {
 @OptIn(FlowPreview::class)
 class NoteEditViewModel(
     private val repository: VaultRepository,
-    private val initialPath: String
+    private val initialPath: String,
+    private val templateManager: com.nool.app.data.templates.TemplateManager? = null
 ) : ViewModel() {
+
+    private val _templates = MutableStateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>>(emptyList())
+    val templates: StateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>> = _templates.asStateFlow()
+
+    fun loadTemplates() {
+        viewModelScope.launch {
+            templateManager?.let { tm ->
+                _templates.value = tm.getTemplates()
+            }
+        }
+    }
+
+    fun insertTemplate(template: com.nool.app.domain.model.VaultItem.NoteItem) {
+        viewModelScope.launch {
+            templateManager?.applyTemplate(template.relativePath, _uiState.value.title)
+                ?.onSuccess { text ->
+                    insertTextAtCursor(if (_uiState.value.textFieldValue.text.isEmpty()) text else "\n$text\n")
+                }
+        }
+    }
+
+    fun insertTextAtCursor(textToInsert: String) {
+        val current = _uiState.value.textFieldValue
+        val start = current.selection.min
+        val end = current.selection.max
+        val newText = current.text.replaceRange(start, end, textToInsert)
+        val newCursor = start + textToInsert.length
+        val newTfv = TextFieldValue(newText, TextRange(newCursor))
+        onTextFieldValueChange(newTfv)
+    }
 
     private val undoRedoManager = UndoRedoManager()
     private val contentChangeFlow = MutableStateFlow("")

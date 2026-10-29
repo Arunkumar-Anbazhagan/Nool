@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -79,6 +80,7 @@ fun LeftSidebarDrawer(
     onSelectTag: (tag: String) -> Unit,
     onCreateNote: () -> Unit,
     onCreateFolder: () -> Unit,
+    onOpenDailyNote: () -> Unit = {},
     onNavigateToTrash: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToGit: () -> Unit,
@@ -120,6 +122,13 @@ fun LeftSidebarDrawer(
                 }
 
                 Row {
+                    IconButton(onClick = onOpenDailyNote) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = "Daily Note",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = onCreateNote) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.NoteAdd,

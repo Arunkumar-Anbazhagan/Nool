@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -102,9 +103,11 @@ fun NoteDetailScreen(
     onNavigateToGraph: (String?) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val templates by viewModel.templates.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var menuExpanded by remember { mutableStateOf(false) }
     var showRightSidePanel by remember { mutableStateOf(false) }
+    var showTemplateDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -260,6 +263,15 @@ fun NoteDetailScreen(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Insert Template") },
+                                leadingIcon = { Icon(Icons.Default.NoteAlt, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.loadTemplates()
+                                    showTemplateDialog = true
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Rename Note") },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -528,6 +540,47 @@ fun NoteDetailScreen(
             ),
             onDismiss = { viewModel.dismissDeleteDialog() },
             onConfirm = { viewModel.moveToTrash() }
+        )
+    }
+
+    if (showTemplateDialog) {
+        AlertDialog(
+            onDismissRequest = { showTemplateDialog = false },
+            icon = { Icon(Icons.Default.NoteAlt, contentDescription = null) },
+            title = { Text("Insert Template") },
+            text = {
+                if (templates.isEmpty()) {
+                    Text(
+                        "No templates found in the templates folder. Create a note in your templates folder to use it as a template.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                    ) {
+                        items(templates) { template ->
+                            ListItem(
+                                headlineContent = { Text(template.title) },
+                                leadingContent = { Icon(Icons.Default.Description, contentDescription = null) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.insertTemplate(template)
+                                        showTemplateDialog = false
+                                    }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTemplateDialog = false }) {
+                    Text("Close")
+                }
+            }
         )
     }
 }

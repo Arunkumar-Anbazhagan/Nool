@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -156,6 +157,10 @@ fun NotesListScreen(
                         scope.launch { drawerState.close() }
                         viewModel.showCreateFolderDialog()
                     },
+                    onOpenDailyNote = {
+                        scope.launch { drawerState.close() }
+                        viewModel.openOrCreateDailyNote()
+                    },
                     onNavigateToTrash = {
                         scope.launch { drawerState.close() }
                         onNavigateToTrash()
@@ -223,6 +228,12 @@ fun NotesListScreen(
                                 onClick = { gitViewModel.toggleSyncLogSheet() }
                             )
                             Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        IconButton(onClick = { viewModel.openOrCreateDailyNote() }) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Daily Note"
+                            )
                         }
                         IconButton(onClick = onNavigateToGraph) {
                             Icon(

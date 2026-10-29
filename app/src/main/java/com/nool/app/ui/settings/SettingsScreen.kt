@@ -50,9 +50,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Commit
+import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.nool.app.ui.components.expressive.GroupedCardContainer
 import com.nool.app.ui.components.expressive.PillListItem
 import com.nool.app.settings.ThemeMode
@@ -69,8 +77,15 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
+    val templatesFolder by viewModel.templatesFolder.collectAsState()
+    val dailyNotesFolder by viewModel.dailyNotesFolder.collectAsState()
     val isRebuildingIndex by viewModel.isRebuildingIndex.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var showTemplatesDialog by remember { mutableStateOf(false) }
+    var showDailyNotesDialog by remember { mutableStateOf(false) }
+    var tempTemplatesText by remember { mutableStateOf("") }
+    var tempDailyNotesText by remember { mutableStateOf("") }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -249,7 +264,30 @@ fun SettingsScreen(
                 )
             }
 
-            // Vault Information Section
+            // Templates & Daily Notes Section
+            GroupedCardContainer(headerTitle = "Templates & Daily Notes") {
+                PillListItem(
+                    title = "Templates Folder",
+                    subtitle = "Location: ${if (templatesFolder.isEmpty()) "Vault Root" else templatesFolder} (supports {{title}}, {{date}}, {{time}})",
+                    leadingIcon = Icons.Default.NoteAlt,
+                    onClick = {
+                        tempTemplatesText = templatesFolder
+                        showTemplatesDialog = true
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                PillListItem(
+                    title = "Daily Notes Folder",
+                    subtitle = "Location: ${if (dailyNotesFolder.isEmpty()) "Vault Root" else dailyNotesFolder} (opens/creates YYYY-MM-DD.md)",
+                    leadingIcon = Icons.Default.CalendarToday,
+                    onClick = {
+                        tempDailyNotesText = dailyNotesFolder
+                        showDailyNotesDialog = true
+                    }
+                )
+            }
+
+            // Storage & Vault Information Section
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -266,5 +304,77 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showTemplatesDialog) {
+        AlertDialog(
+            onDismissRequest = { showTemplatesDialog = false },
+            title = { Text("Templates Folder") },
+            text = {
+                Column {
+                    Text(
+                        "Specify the folder where your template markdown files are stored. Variables like {{title}}, {{date}}, and {{time}} will be resolved.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = tempTemplatesText,
+                        onValueChange = { tempTemplatesText = it },
+                        label = { Text("Folder Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.setTemplatesFolder(tempTemplatesText)
+                    showTemplatesDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTemplatesDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showDailyNotesDialog) {
+        AlertDialog(
+            onDismissRequest = { showDailyNotesDialog = false },
+            title = { Text("Daily Notes Folder") },
+            text = {
+                Column {
+                    Text(
+                        "Specify the folder where daily notes will be created or opened (named YYYY-MM-DD.md).",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = tempDailyNotesText,
+                        onValueChange = { tempDailyNotesText = it },
+                        label = { Text("Folder Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.setDailyNotesFolder(tempDailyNotesText)
+                    showDailyNotesDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDailyNotesDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
