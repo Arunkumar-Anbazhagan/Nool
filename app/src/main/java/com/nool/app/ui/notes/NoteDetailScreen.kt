@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -87,6 +88,7 @@ import com.nool.app.domain.model.VaultItem
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.MarkdownRenderer
 import com.nool.app.ui.editor.MarkdownToolbar
+import com.nool.app.ui.navigation.quickswitcher.QuickSwitcherDialog
 import com.nool.app.ui.notes.components.BacklinksSheet
 import com.nool.app.ui.notes.components.DeleteConfirmationDialog
 import com.nool.app.ui.notes.components.RenameDialog
@@ -103,11 +105,13 @@ fun NoteDetailScreen(
     onNavigateToGraph: (String?) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val allVaultNotes by viewModel.allVaultNotes.collectAsState()
     val templates by viewModel.templates.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var menuExpanded by remember { mutableStateOf(false) }
     var showRightSidePanel by remember { mutableStateOf(false) }
     var showTemplateDialog by remember { mutableStateOf(false) }
+    var showQuickSwitcher by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -263,6 +267,14 @@ fun NoteDetailScreen(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Quick Switcher") },
+                                leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    menuExpanded = false
+                                    showQuickSwitcher = true
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Insert Template") },
                                 leadingIcon = { Icon(Icons.Default.NoteAlt, contentDescription = null) },
@@ -583,6 +595,17 @@ fun NoteDetailScreen(
                 TextButton(onClick = { showTemplateDialog = false }) {
                     Text("Close")
                 }
+            }
+        )
+    }
+
+    if (showQuickSwitcher) {
+        QuickSwitcherDialog(
+            notes = allVaultNotes,
+            onDismiss = { showQuickSwitcher = false },
+            onSelectNote = { path ->
+                showQuickSwitcher = false
+                onNavigateToNote(path)
             }
         )
     }

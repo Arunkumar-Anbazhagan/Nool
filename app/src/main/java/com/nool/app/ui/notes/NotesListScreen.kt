@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
@@ -68,6 +69,7 @@ import com.nool.app.domain.model.VaultItem
 import com.nool.app.ui.components.expressive.FloatingPillNavDock
 import com.nool.app.ui.components.expressive.NavDockItem
 import com.nool.app.ui.components.expressive.ScallopedFlowerButton
+import com.nool.app.ui.navigation.quickswitcher.QuickSwitcherDialog
 import com.nool.app.ui.sidebar.LeftSidebarDrawer
 import com.nool.app.ui.notes.components.BreadcrumbsBar
 import com.nool.app.ui.notes.components.CreateFolderDialog
@@ -109,6 +111,7 @@ fun NotesListScreen(
     val gitSyncLogs by gitViewModel.syncLogs.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showCreateBottomSheet by remember { mutableStateOf(false) }
+    var showQuickSwitcher by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -229,6 +232,13 @@ fun NotesListScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                         }
+                        IconButton(onClick = { showQuickSwitcher = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = "Quick Switcher",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         IconButton(onClick = { viewModel.openOrCreateDailyNote() }) {
                             Icon(
                                 imageVector = Icons.Default.CalendarToday,
@@ -276,6 +286,7 @@ fun NotesListScreen(
                 FloatingPillNavDock(
                     items = listOf(
                         NavDockItem("notes", "Notes", Icons.Default.Description),
+                        NavDockItem("switcher", "Switch", Icons.Default.Bolt),
                         NavDockItem("search", "Search", Icons.Default.Search),
                         NavDockItem("graph", "Graph", Icons.Default.Hub),
                         NavDockItem("settings", "Settings", Icons.Default.Settings)
@@ -283,6 +294,7 @@ fun NotesListScreen(
                     selectedItemId = "notes",
                     onItemSelected = { item ->
                         when (item.id) {
+                            "switcher" -> showQuickSwitcher = true
                             "search" -> onNavigateToSearch()
                             "graph" -> onNavigateToGraph()
                             "settings" -> onNavigateToSettings()
@@ -413,6 +425,17 @@ fun NotesListScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    if (showQuickSwitcher) {
+        QuickSwitcherDialog(
+            notes = allVaultNotes,
+            onDismiss = { showQuickSwitcher = false },
+            onSelectNote = { path ->
+                showQuickSwitcher = false
+                onNavigateToNote(path)
+            }
+        )
     }
 
     // Dialogs

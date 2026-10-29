@@ -104,6 +104,8 @@ class NoteEditViewModel(
     private val undoRedoManager = UndoRedoManager()
     private val contentChangeFlow = MutableStateFlow("")
     private var cachedCatalog: List<NoteTitleAndPath> = emptyList()
+    private val _allVaultNotes = MutableStateFlow<List<com.nool.app.data.index.NoteEntity>>(emptyList())
+    val allVaultNotes: StateFlow<List<com.nool.app.data.index.NoteEntity>> = _allVaultNotes.asStateFlow()
 
     private val _uiState = MutableStateFlow(
         NoteEditUiState(
@@ -142,6 +144,9 @@ class NoteEditViewModel(
         viewModelScope.launch {
             repository.getNoteCatalog().onSuccess { catalog ->
                 cachedCatalog = catalog
+            }
+            repository.searchNotes("", scope = com.nool.app.data.index.SearchScope.ALL).onSuccess { notes ->
+                _allVaultNotes.value = notes
             }
         }
     }
