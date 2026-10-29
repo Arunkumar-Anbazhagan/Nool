@@ -153,4 +153,22 @@ object MarkdownFormattingHelper {
         val cursor = selection.start + snippet.length
         return TextFieldValue(newText, TextRange(cursor, cursor))
     }
+
+    fun insertCallout(
+        current: TextFieldValue,
+        type: String = "note",
+        title: String = "",
+        collapsible: String = ""
+    ): TextFieldValue {
+        val text = current.text
+        val selection = current.selection
+        val selected = if (selection.collapsed) "Callout text here" else text.substring(selection.start, selection.end)
+        val titlePart = if (title.isNotBlank()) " $title" else ""
+        val snippet = "> [!$type]$collapsible$titlePart\n> $selected\n"
+        val prefix = if (selection.start > 0 && text[selection.start - 1] != '\n') "\n\n" else "\n"
+        val finalSnippet = "$prefix$snippet"
+        val newText = text.replaceRange(selection.start, selection.end, finalSnippet)
+        val cursor = selection.start + finalSnippet.length
+        return TextFieldValue(newText, TextRange(cursor, cursor))
+    }
 }

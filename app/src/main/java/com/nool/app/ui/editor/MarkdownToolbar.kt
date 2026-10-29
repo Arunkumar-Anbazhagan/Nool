@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
@@ -51,6 +52,7 @@ fun MarkdownToolbar(
     onInlineCode: () -> Unit,
     onCodeBlock: () -> Unit,
     onBlockquote: () -> Unit,
+    onCallout: () -> Unit = {},
     onTable: () -> Unit,
     onLink: () -> Unit,
     onWikiLink: () -> Unit,
@@ -124,6 +126,9 @@ fun MarkdownToolbar(
             // Quotes & Code
             IconButton(onClick = onBlockquote, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.FormatQuote, contentDescription = "Blockquote", modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onCallout, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Info, contentDescription = "Callout", modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onInlineCode, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Code, contentDescription = "Inline Code", modifier = Modifier.size(20.dp))

@@ -319,6 +319,9 @@ fun NoteDetailScreen(
                     onInlineCode = { viewModel.formatInlineCode() },
                     onCodeBlock = { viewModel.formatCodeBlock() },
                     onBlockquote = { viewModel.formatBlockquote() },
+                    onCallout = {
+                        viewModel.applyFormat { MarkdownFormattingHelper.insertCallout(it) }
+                    },
                     onTable = { viewModel.formatTable() },
                     onLink = { viewModel.formatLink() },
                     onWikiLink = {

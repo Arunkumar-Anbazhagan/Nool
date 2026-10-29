@@ -23,6 +23,14 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.nool.app.ui.editor.callout.CalloutHelper
+import com.nool.app.ui.editor.callout.CalloutInfo
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -328,6 +336,43 @@ private fun RenderBlockQuote(
     onLinkClick: ((url: String) -> Unit)?,
     onWikiLinkClick: ((target: String) -> Unit)?
 ) {
+    // Check if this blockquote is an Obsidian callout
+    val firstBlock = blockQuote.firstChild
+    var calloutInfo: CalloutInfo? = null
+    var firstParagraphRestText: String? = null
+
+    if (firstBlock is Paragraph) {
+        val firstInline = firstBlock.firstChild
+        if (firstInline is org.commonmark.node.Text) {
+            val literal = firstInline.literal
+            val lines = literal.lines()
+            val firstLine = lines.firstOrNull().orEmpty()
+            val parsed = CalloutHelper.parseCalloutHeader(firstLine)
+            if (parsed != null) {
+                calloutInfo = parsed
+                val restLines = lines.drop(1).joinToString("\n")
+                if (restLines.isNotBlank()) {
+                    firstParagraphRestText = restLines
+                }
+            }
+        }
+    }
+
+    if (calloutInfo != null && firstBlock is Paragraph) {
+        RenderCallout(
+            callout = calloutInfo,
+            firstParagraph = firstBlock,
+            firstParagraphRemainingText = firstParagraphRestText,
+            vaultRoot = vaultRoot,
+            markdown = markdown,
+            onToggleTask = onToggleTask,
+            onLinkClick = onLinkClick,
+            onWikiLinkClick = onWikiLinkClick
+        )
+        return
+    }
+
+    // Default Blockquote Rendering
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -350,6 +395,99 @@ private fun RenderBlockQuote(
             while (child != null) {
                 RenderBlockNode(child, vaultRoot, markdown, onToggleTask, onLinkClick, onWikiLinkClick)
                 child = child.next
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderCallout(
+    callout: CalloutInfo,
+    firstParagraph: Paragraph,
+    firstParagraphRemainingText: String?,
+    vaultRoot: File,
+    markdown: String,
+    onToggleTask: ((lineIndex: Int, isChecked: Boolean) -> Unit)?,
+    onLinkClick: ((url: String) -> Unit)?,
+    onWikiLinkClick: ((target: String) -> Unit)?
+) {
+    var isExpanded by remember { mutableStateOf(!callout.isInitiallyCollapsed) }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = callout.color.copy(alpha = 0.08f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .border(1.dp, callout.color.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .background(callout.color)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                // Header (Clickable if collapsible)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (callout.isCollapsible) {
+                                Modifier.clickable { isExpanded = !isExpanded }
+                            } else Modifier
+                        )
+                ) {
+                    Icon(
+                        imageVector = callout.icon,
+                        contentDescription = null,
+                        tint = callout.color,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = callout.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = callout.color,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (callout.isCollapsible) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = callout.color,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Body content
+                if (isExpanded) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (!firstParagraphRemainingText.isNullOrBlank()) {
+                            Text(
+                                text = firstParagraphRemainingText,
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Render subsequent block nodes in the callout
+                        var nextBlock = firstParagraph.next
+                        while (nextBlock != null) {
+                            RenderBlockNode(nextBlock, vaultRoot, markdown, onToggleTask, onLinkClick, onWikiLinkClick)
+                            nextBlock = nextBlock.next
+                        }
+                    }
+                }
             }
         }
     }
