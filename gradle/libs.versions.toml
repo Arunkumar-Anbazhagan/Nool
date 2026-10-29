@@ -57,7 +57,6 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
 commonmark-ext-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 commonmark-ext-gfm-strikethrough = { group = "org.commonmark", name = "commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }
-commonmark-ext-task-list-items = { group = "org.commonmark", name = "commonmark-ext-task-list-items", version.ref = "commonmark" }
 
 # Room
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
