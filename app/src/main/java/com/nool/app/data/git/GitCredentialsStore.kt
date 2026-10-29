@@ -9,7 +9,7 @@ import com.jcraft.jsch.KeyPair
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-class GitCredentialsStore(private val context: Context) {
+class GitCredentialsStore(private val context: Context? = null) {
 
     @Volatile
     private var prefs: SharedPreferences? = null
@@ -19,19 +19,23 @@ class GitCredentialsStore(private val context: Context) {
         prefs?.let { return it }
         return synchronized(prefsLock) {
             prefs ?: run {
-                val p = try {
-                    val masterKey = MasterKey.Builder(context)
-                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                        .build()
-                    EncryptedSharedPreferences.create(
-                        context,
-                        "nool_git_secure_prefs",
-                        masterKey,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    )
-                } catch (e: Exception) {
-                    context.getSharedPreferences("nool_git_fallback_prefs", Context.MODE_PRIVATE)
+                val p = if (context == null) {
+                    InMemorySharedPreferences()
+                } else {
+                    try {
+                        val masterKey = MasterKey.Builder(context)
+                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                            .build()
+                        EncryptedSharedPreferences.create(
+                            context,
+                            "nool_git_secure_prefs",
+                            masterKey,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                        )
+                    } catch (e: Exception) {
+                        context.getSharedPreferences("nool_git_fallback_prefs", Context.MODE_PRIVATE)
+                    }
                 }
                 prefs = p
                 p
@@ -154,7 +158,8 @@ class GitCredentialsStore(private val context: Context) {
     }
 
     fun getKnownHostsFile(): File {
-        val file = File(context.filesDir, "git_known_hosts")
+        val dir = context?.filesDir ?: File(System.getProperty("java.io.tmpdir", "."))
+        val file = File(dir, "git_known_hosts")
         if (!file.exists()) {
             file.createNewFile()
         }
@@ -174,5 +179,46 @@ class GitCredentialsStore(private val context: Context) {
      */
     fun redactUrl(url: String): String {
         return url.replace(Regex("://[^@]+@"), "://***@")
+    }
+}
+
+private class InMemorySharedPreferences : SharedPreferences {
+    private val data = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    override fun getAll(): MutableMap<String, *> = HashMap(data)
+    override fun getString(key: String?, defValue: String?): String? = data[key] as? String ?: defValue
+    @Suppress("UNCHECKED_CAST")
+    override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+        (data[key] as? Set<String>)?.toMutableSet() ?: defValues
+    override fun getInt(key: String?, defValue: Int): Int = (data[key] as? Int) ?: defValue
+    override fun getLong(key: String?, defValue: Long): Long = (data[key] as? Long) ?: defValue
+    override fun getFloat(key: String?, defValue: Float): Float = (data[key] as? Float) ?: defValue
+    override fun getBoolean(key: String?, defValue: Boolean): Boolean = (data[key] as? Boolean) ?: defValue
+    override fun contains(key: String?): Boolean = data.containsKey(key)
+    override fun edit(): SharedPreferences.Editor = Editor(this)
+    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+    private class Editor(private val prefs: InMemorySharedPreferences) : SharedPreferences.Editor {
+        private val temp = HashMap<String, Any?>()
+        private var clear = false
+
+        override fun putString(key: String?, value: String?): SharedPreferences.Editor { if (key != null) temp[key] = value; return this }
+        override fun putStringSet(key: String?, values: MutableSet<String>?): SharedPreferences.Editor { if (key != null) temp[key] = values?.toSet(); return this }
+        override fun putInt(key: String?, value: Int): SharedPreferences.Editor { if (key != null) temp[key] = value; return this }
+        override fun putLong(key: String?, value: Long): SharedPreferences.Editor { if (key != null) temp[key] = value; return this }
+        override fun putFloat(key: String?, value: Float): SharedPreferences.Editor { if (key != null) temp[key] = value; return this }
+        override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor { if (key != null) temp[key] = value; return this }
+        override fun remove(key: String?): SharedPreferences.Editor { if (key != null) temp[key] = this; return this }
+        override fun clear(): SharedPreferences.Editor { clear = true; return this }
+        override fun commit(): Boolean { apply(); return true }
+        override fun apply() {
+            if (clear) prefs.data.clear()
+            for ((k, v) in temp) {
+                if (v === this) prefs.data.remove(k)
+                else if (v != null) prefs.data[k] = v
+                else prefs.data.remove(k)
+            }
+        }
     }
 }

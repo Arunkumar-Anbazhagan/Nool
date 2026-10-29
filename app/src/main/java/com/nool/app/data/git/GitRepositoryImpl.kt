@@ -547,6 +547,16 @@ class GitRepositoryImpl(
             val targetFile = File(getActiveRepoDir(), path)
             targetFile.parentFile?.mkdirs()
             targetFile.writeText(content, Charsets.UTF_8)
+
+            // Restore creates a new commit
+            val shortHash = if (commitHash.length >= 7) commitHash.take(7) else commitHash
+            val fileName = File(path).name
+            getGit().use { git ->
+                git.add().addFilepattern(path).call()
+                git.commit()
+                    .setMessage("Restore $fileName from commit $shortHash")
+                    .call()
+            }
             Unit
         }.recoverCatching { mapException(it) }
     }

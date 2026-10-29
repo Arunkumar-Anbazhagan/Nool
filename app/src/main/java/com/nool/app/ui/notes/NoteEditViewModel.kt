@@ -51,7 +51,12 @@ data class NoteEditUiState(
     val wikiLinkQuery: String = "",
     val wikiLinkSuggestions: List<NoteTitleAndPath> = emptyList(),
     val missingNoteToCreate: String? = null,
-    val properties: List<PropertyItem> = emptyList()
+    val properties: List<PropertyItem> = emptyList(),
+    val showVersionHistory: Boolean = false,
+    val isVersionHistoryLoading: Boolean = false,
+    val noteHistoryCommits: List<com.nool.app.data.git.GitCommit> = emptyList(),
+    val previewCommit: com.nool.app.data.git.GitCommit? = null,
+    val previewCommitContent: String? = null
 ) {
     val content: String get() = textFieldValue.text
     val isDirty: Boolean get() = textFieldValue.text != initialContent
@@ -68,11 +73,75 @@ sealed interface NoteEditEvent {
 class NoteEditViewModel(
     private val repository: VaultRepository,
     private val initialPath: String,
-    private val templateManager: com.nool.app.data.templates.TemplateManager? = null
+    private val templateManager: com.nool.app.data.templates.TemplateManager? = null,
+    private val gitRepository: com.nool.app.data.git.GitRepository? = null
 ) : ViewModel() {
 
     private val _templates = MutableStateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>>(emptyList())
     val templates: StateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>> = _templates.asStateFlow()
+
+    fun openVersionHistory() {
+        _uiState.update { it.copy(showVersionHistory = true, isVersionHistoryLoading = true) }
+        viewModelScope.launch {
+            if (gitRepository == null || !gitRepository.isRepo()) {
+                _uiState.update { it.copy(isVersionHistoryLoading = false, noteHistoryCommits = emptyList()) }
+                return@launch
+            }
+            gitRepository.getFileHistory(_uiState.value.relativePath)
+                .onSuccess { commits ->
+                    _uiState.update { it.copy(noteHistoryCommits = commits, isVersionHistoryLoading = false) }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isVersionHistoryLoading = false) }
+                    _events.emit(NoteEditEvent.ShowMessage("Failed to load history: ${it.message}"))
+                }
+        }
+    }
+
+    fun closeVersionHistory() {
+        _uiState.update {
+            it.copy(
+                showVersionHistory = false,
+                previewCommit = null,
+                previewCommitContent = null
+            )
+        }
+    }
+
+    fun viewCommitContent(commit: com.nool.app.data.git.GitCommit) {
+        viewModelScope.launch {
+            gitRepository?.getFileContentAtCommit(_uiState.value.relativePath, commit.hash)
+                ?.onSuccess { content ->
+                    _uiState.update {
+                        it.copy(
+                            previewCommit = commit,
+                            previewCommitContent = content
+                        )
+                    }
+                }
+                ?.onFailure {
+                    _events.emit(NoteEditEvent.ShowMessage("Failed to read commit content: ${it.message}"))
+                }
+        }
+    }
+
+    fun closeCommitPreview() {
+        _uiState.update { it.copy(previewCommit = null, previewCommitContent = null) }
+    }
+
+    fun restoreVersion(commit: com.nool.app.data.git.GitCommit) {
+        viewModelScope.launch {
+            gitRepository?.restoreFileFromCommit(_uiState.value.relativePath, commit.hash)
+                ?.onSuccess {
+                    loadNote(_uiState.value.relativePath)
+                    closeVersionHistory()
+                    _events.emit(NoteEditEvent.ShowMessage("Restored note to commit ${commit.shortHash}"))
+                }
+                ?.onFailure {
+                    _events.emit(NoteEditEvent.ShowMessage("Failed to restore: ${it.message}"))
+                }
+        }
+    }
 
     fun loadTemplates() {
         viewModelScope.launch {

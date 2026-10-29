@@ -52,7 +52,7 @@ val appModule = module {
 
     // ViewModels
     viewModel { (folder: String) -> NotesViewModel(get(), get(), folder, get()) }
-    viewModel { (notePath: String) -> NoteEditViewModel(get(), notePath, get()) }
+    viewModel { (notePath: String) -> NoteEditViewModel(get(), notePath, get(), get()) }
     viewModel { TrashViewModel(get()) }
     viewModel { (initialTag: String?, initialQuery: String?) -> SearchViewModel(get(), get(), initialTag, initialQuery) }
     viewModel { SettingsViewModel(get(), get()) }
