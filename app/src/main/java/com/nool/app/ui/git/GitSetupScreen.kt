@@ -1,5 +1,7 @@
 package com.nool.app.ui.git
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,12 +20,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -34,6 +39,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,6 +63,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -92,11 +100,29 @@ fun GitSetupScreen(
 
     fun extractRepoName(url: String): String {
         val clean = url.trim().removeSuffix("/").removeSuffix(".git")
-        return clean.substringAfterLast("/").trim().ifEmpty { "notes" }
+        val candidate = clean.substringAfterLast("/").substringAfterLast(":")
+        return candidate.trim().replace(Regex("[^a-zA-Z0-9._-]"), "_").ifEmpty { "notes" }
     }
 
     val suggestedRepoName = remember(remoteUrl) {
-        if (remoteUrl.isNotBlank() && remoteUrl.contains("/")) extractRepoName(remoteUrl) else "notes"
+        if (remoteUrl.isNotBlank() && (remoteUrl.contains("/") || remoteUrl.contains(":"))) extractRepoName(remoteUrl) else "notes"
+    }
+
+    val safLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val uriPath = uri.path ?: ""
+            val rawName = uriPath.substringAfterLast(":").substringAfterLast("/")
+            val cleanName = rawName.trim().replace(Regex("[^a-zA-Z0-9._-]"), "_").ifEmpty { suggestedRepoName }
+            viewModel.createFolder(cleanName) { created ->
+                targetFolder = created
+                showFolderPicker = false
+                scope.launch {
+                    snackbarHostState.showSnackbar("Target directory set to '$created' in vault storage")
+                }
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -366,46 +392,171 @@ fun GitSetupScreen(
         }
     }
 
-    // Existing Folder Picker Dialog
+    // Folder Picker Dialog
     if (showFolderPicker) {
+        var newFolderNameInput by remember { mutableStateOf(suggestedRepoName) }
+        var folderFilter by remember { mutableStateOf("") }
+
+        val filteredFolders = remember(uiState.existingFolders, folderFilter) {
+            if (folderFilter.isBlank()) uiState.existingFolders
+            else uiState.existingFolders.filter { it.contains(folderFilter, ignoreCase = true) }
+        }
+
         AlertDialog(
             onDismissRequest = { showFolderPicker = false },
-            title = { Text("Select Destination Folder") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Select Destination Directory", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+            },
             text = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Text(
+                        text = "Git repositories clone into local app vault storage for high performance and native SSH locking.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Option A: Browse Device / External folder via SAF
+                    OutlinedButton(
+                        onClick = { safLauncher.launch(null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Browse Device Storage (SAF)")
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Option B: Create New Folder right here
+                    Text(
+                        text = "Create New Directory",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newFolderNameInput,
+                            onValueChange = { newFolderNameInput = it },
+                            placeholder = { Text("folder_name") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Button(
+                            onClick = {
+                                val clean = newFolderNameInput.trim().trim('/')
+                                if (clean.isNotBlank()) {
+                                    viewModel.createFolder(clean) { created ->
+                                        targetFolder = created
+                                        showFolderPicker = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Created & selected folder '$created'")
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = newFolderNameInput.isNotBlank(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Create")
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Option C: Vault Folders List
+                    Text(
+                        text = "Vault Folders",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    if (uiState.existingFolders.size > 4) {
+                        OutlinedTextField(
+                            value = folderFilter,
+                            onValueChange = { folderFilter = it },
+                            placeholder = { Text("Search folders...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    // Root Vault item
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (targetFolder.isEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 targetFolder = ""
                                 showFolderPicker = false
                             }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Root Vault (/)", fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Root Vault (/)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Text("Clones directly into top-level notes directory", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (targetFolder.isEmpty()) {
+                                Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
 
-                    uiState.existingFolders.forEach { folder ->
-                        Row(
+                    filteredFolders.forEach { folder ->
+                        val isSelected = targetFolder == folder
+                        Card(
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
                                     targetFolder = folder
                                     showFolderPicker = false
                                 }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(folder)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Folder, contentDescription = null, tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(folder, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
                         }
                     }
                 }

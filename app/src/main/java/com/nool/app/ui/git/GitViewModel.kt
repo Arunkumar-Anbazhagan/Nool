@@ -102,6 +102,18 @@ class GitViewModel(
         }
     }
 
+    fun createFolder(folderName: String, onCreated: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            val clean = folderName.trim().trim('/')
+            if (clean.isNotBlank()) {
+                gitRepository.createFolder(clean).onSuccess {
+                    loadExistingFolders()
+                    onCreated(clean)
+                }
+            }
+        }
+    }
+
     suspend fun isDirectoryEmpty(targetSubfolder: String): Boolean {
         return gitRepository.isDirectoryEmpty(targetSubfolder)
     }

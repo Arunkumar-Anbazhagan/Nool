@@ -80,7 +80,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -95,6 +97,7 @@ import com.nool.app.data.export.PdfExporter
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.MarkdownRenderer
 import com.nool.app.ui.editor.MarkdownToolbar
+import com.nool.app.ui.editor.audio.AudioRecorderDialog
 import com.nool.app.ui.navigation.quickswitcher.QuickSwitcherDialog
 import com.nool.app.ui.notes.components.BacklinksSheet
 import com.nool.app.ui.notes.components.DeleteConfirmationDialog
@@ -115,6 +118,7 @@ fun NoteDetailScreen(
     val allVaultNotes by viewModel.allVaultNotes.collectAsState()
     val templates by viewModel.templates.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var menuExpanded by remember { mutableStateOf(false) }
     var showRightSidePanel by remember { mutableStateOf(false) }
     var showTemplateDialog by remember { mutableStateOf(false) }
@@ -131,6 +135,19 @@ fun NoteDetailScreen(
             if (inputStream != null) {
                 val fileName = "image_${System.currentTimeMillis()}.png"
                 viewModel.attachFile(fileName, inputStream)
+            }
+        }
+    }
+
+    var showAudioRecorder by remember { mutableStateOf(false) }
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showAudioRecorder = true
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar("Microphone permission required for voice notes")
             }
         }
     }
@@ -372,7 +389,10 @@ fun NoteDetailScreen(
                     onWikiLink = {
                         viewModel.applyFormat { MarkdownFormattingHelper.insertWikiLink(it) }
                     },
-                    onAttachImage = { imagePickerLauncher.launch("image/*") }
+                    onAttachImage = { imagePickerLauncher.launch("image/*") },
+                    onRecordAudio = {
+                        recordAudioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
                 )
             }
         },
@@ -630,6 +650,31 @@ fun NoteDetailScreen(
                     Text("Close")
                 }
             }
+        )
+    }
+
+    if (showAudioRecorder) {
+        val attachmentsDir = java.io.File(viewModel.getVaultRoot(), "attachments")
+        AudioRecorderDialog(
+            targetDir = attachmentsDir,
+            onAudioRecorded = { file ->
+                val snippet = "![[attachments/${file.name}]]\n"
+                val current = uiState.textFieldValue
+                val newText = current.text.replaceRange(
+                    current.selection.start,
+                    current.selection.end,
+                    snippet
+                )
+                val cursor = current.selection.start + snippet.length
+                viewModel.onTextFieldValueChange(
+                    androidx.compose.ui.text.input.TextFieldValue(
+                        newText,
+                        androidx.compose.ui.text.TextRange(cursor)
+                    )
+                )
+                viewModel.saveImmediately()
+            },
+            onDismiss = { showAudioRecorder = false }
         )
     }
 

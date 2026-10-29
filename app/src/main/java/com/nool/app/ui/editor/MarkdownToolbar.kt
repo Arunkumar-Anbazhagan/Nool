@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.Icon
@@ -57,6 +58,7 @@ fun MarkdownToolbar(
     onLink: () -> Unit,
     onWikiLink: () -> Unit,
     onAttachImage: () -> Unit,
+    onRecordAudio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -157,6 +159,9 @@ fun MarkdownToolbar(
             }
             IconButton(onClick = onAttachImage, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Image, contentDescription = "Attach Image", modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onRecordAudio, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Mic, contentDescription = "Record Audio", modifier = Modifier.size(20.dp))
             }
         }
     }

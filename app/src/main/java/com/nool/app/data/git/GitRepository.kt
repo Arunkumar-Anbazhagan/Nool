@@ -15,6 +15,7 @@ interface GitRepository {
 
     suspend fun isDirectoryEmpty(targetSubfolder: String = ""): Boolean
     suspend fun listExistingFolders(): List<String>
+    suspend fun createFolder(subfolder: String): Result<Unit>
     fun getActiveRepoDir(): File
     suspend fun setRepoSubfolder(subfolder: String): Unit
 

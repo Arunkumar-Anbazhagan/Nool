@@ -158,7 +158,7 @@ class GitCredentialsStore(private val context: Context? = null) {
     }
 
     fun getKnownHostsFile(): File {
-        val dir = context?.filesDir ?: File(System.getProperty("java.io.tmpdir", "."))
+        val dir = context?.filesDir ?: File(System.getProperty("java.io.tmpdir") ?: ".")
         val file = File(dir, "git_known_hosts")
         if (!file.exists()) {
             file.createNewFile()

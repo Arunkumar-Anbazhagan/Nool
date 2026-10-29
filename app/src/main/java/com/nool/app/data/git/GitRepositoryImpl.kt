@@ -83,6 +83,16 @@ class GitRepositoryImpl(
         list.sorted()
     }
 
+    override suspend fun createFolder(subfolder: String): Result<Unit> = withContext(gitDispatcher) {
+        runCatching {
+            val dir = resolveDir(subfolder)
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+            Unit
+        }
+    }
+
     private fun getGit(): Git {
         val dir = getActiveRepoDir()
         val gitDir = File(dir, ".git")

@@ -381,6 +381,13 @@ class NoteEditViewModel(
         }
     }
 
+    fun saveImmediately() {
+        viewModelScope.launch {
+            val content = _uiState.value.textFieldValue.text
+            saveInternal(content)
+        }
+    }
+
     fun flushSave() {
         val current = _uiState.value
         if (current.isDirty) {
@@ -506,7 +513,7 @@ class NoteEditViewModel(
     }
 
     fun toggleTask(lineIndex: Int, isChecked: Boolean) {
-        val currentText = _uiState.value.textFieldValue.text
+        val currentText = _uiState.value.textFieldValue.text.ifEmpty { _uiState.value.content }
         val lines = currentText.lines().toMutableList()
         if (lineIndex in lines.indices) {
             val line = lines[lineIndex]
@@ -522,6 +529,7 @@ class NoteEditViewModel(
             val newText = lines.joinToString("\n")
             val newTfv = TextFieldValue(newText, _uiState.value.textFieldValue.selection)
             onTextFieldValueChange(newTfv)
+            saveImmediately()
         }
     }
 
@@ -535,7 +543,13 @@ class NoteEditViewModel(
                                   fileName.endsWith(".webp", true) ||
                                   fileName.endsWith(".gif", true)
 
-                    val snippet = if (isImage) {
+                    val isAudio = fileName.endsWith(".m4a", true) ||
+                                  fileName.endsWith(".mp3", true) ||
+                                  fileName.endsWith(".wav", true) ||
+                                  fileName.endsWith(".aac", true) ||
+                                  fileName.endsWith(".ogg", true)
+
+                    val snippet = if (isImage || isAudio) {
                         "![[attachments/$fileName]]\n"
                     } else {
                         "[[attachments/$fileName]]\n"

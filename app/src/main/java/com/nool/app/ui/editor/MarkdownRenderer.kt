@@ -258,6 +258,19 @@ private fun RenderParagraph(
     val embedMatch = Regex("""^!\[\[([^\]\n]+)\]\]$""").matchEntire(plain)
     if (embedMatch != null) {
         val target = embedMatch.groupValues[1].trim()
+        val isAudio = target.endsWith(".m4a", true) || target.endsWith(".mp3", true) ||
+                      target.endsWith(".wav", true) || target.endsWith(".aac", true) ||
+                      target.endsWith(".ogg", true)
+
+        if (isAudio) {
+            val file = if (target.startsWith("attachments/")) File(vaultRoot, target) else File(vaultRoot, "attachments/$target")
+            com.nool.app.ui.editor.audio.AudioPlayerCard(
+                audioFile = file,
+                fileName = target.substringAfterLast("/")
+            )
+            return
+        }
+
         val isImage = target.endsWith(".png", true) || target.endsWith(".jpg", true) ||
                       target.endsWith(".jpeg", true) || target.endsWith(".webp", true) ||
                       target.endsWith(".gif", true) || target.startsWith("attachments/")
@@ -802,7 +815,16 @@ private fun RenderListItem(
                 checked = isChecked,
                 onCheckedChange = { newChecked ->
                     val lines = markdown.lines()
-                    val targetLineIndex = lines.indexOfFirst { it.contains(itemText) }
+                    val targetLineIndex = lines.indexOfFirst { line ->
+                        val trimmed = line.trim()
+                        trimmed.startsWith("- [ ] $cleanTaskText") ||
+                        trimmed.startsWith("- [x] $cleanTaskText") ||
+                        trimmed.startsWith("- [X] $cleanTaskText") ||
+                        trimmed.startsWith("* [ ] $cleanTaskText") ||
+                        trimmed.startsWith("* [x] $cleanTaskText") ||
+                        trimmed.startsWith("* [X] $cleanTaskText") ||
+                        (trimmed.contains(cleanTaskText) && (trimmed.contains("[ ]") || trimmed.contains("[x]") || trimmed.contains("[X]")))
+                    }
                     if (targetLineIndex != -1) {
                         onToggleTask?.invoke(targetLineIndex, newChecked)
                     }
