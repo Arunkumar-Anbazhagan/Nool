@@ -50,6 +50,7 @@ class SettingsRepository(
         private val KEY_TEMPLATES_FOLDER = stringPreferencesKey("templates_folder")
         private val KEY_DAILY_NOTES_FOLDER = stringPreferencesKey("daily_notes_folder")
         private val KEY_SAVED_SEARCHES = stringPreferencesKey("saved_searches")
+        private val KEY_BIOMETRIC_LOCK = booleanPreferencesKey("biometric_lock")
     }
 
     val themeMode: Flow<ThemeMode> = dataStore?.data?.map { prefs ->
@@ -85,6 +86,10 @@ class SettingsRepository(
     val dailyNotesFolder: Flow<String> = dataStore?.data?.map { prefs ->
         prefs[KEY_DAILY_NOTES_FOLDER] ?: "Daily Notes"
     } ?: kotlinx.coroutines.flow.flowOf("Daily Notes")
+
+    val biometricLock: Flow<Boolean> = dataStore?.data?.map { prefs ->
+        prefs[KEY_BIOMETRIC_LOCK] ?: false
+    } ?: kotlinx.coroutines.flow.flowOf(false)
 
     val savedSearches: Flow<List<SavedSearch>> = dataStore?.data?.map { prefs ->
         val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
@@ -178,5 +183,9 @@ class SettingsRepository(
 
     suspend fun setDailyNotesFolder(folder: String) {
         dataStore?.edit { it[KEY_DAILY_NOTES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") }
+    }
+
+    suspend fun setBiometricLock(enabled: Boolean) {
+        dataStore?.edit { it[KEY_BIOMETRIC_LOCK] = enabled }
     }
 }

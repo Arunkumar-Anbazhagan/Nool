@@ -113,6 +113,7 @@ dependencies {
 
     // Security & Keystore
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
 
     // WorkManager (Background Fallback)
     implementation(libs.androidx.work.runtime.ktx)

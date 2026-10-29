@@ -39,6 +39,9 @@ class SettingsViewModel(
     val dailyNotesFolder: StateFlow<String> = settingsRepository.dailyNotesFolder
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Daily Notes")
 
+    val biometricLock: StateFlow<Boolean> = settingsRepository.biometricLock
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _isRebuildingIndex = MutableStateFlow(false)
     val isRebuildingIndex: StateFlow<Boolean> = _isRebuildingIndex.asStateFlow()
 
@@ -72,6 +75,12 @@ class SettingsViewModel(
     fun setDailyNotesFolder(folder: String) {
         viewModelScope.launch {
             settingsRepository.setDailyNotesFolder(folder)
+        }
+    }
+
+    fun setBiometricLock(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setBiometricLock(enabled)
         }
     }
 
