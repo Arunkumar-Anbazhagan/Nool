@@ -19,6 +19,8 @@ import com.nool.app.ui.notes.NotesViewModel
 import com.nool.app.ui.search.SearchViewModel
 import com.nool.app.ui.settings.SettingsViewModel
 import com.nool.app.ui.trash.TrashViewModel
+import com.nool.app.data.share.ShareManager
+import com.nool.app.ui.share.ShareViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -30,6 +32,7 @@ val appModule = module {
     single { IndexManager(get<FileManager>().vaultRoot, get()) }
     single { SettingsRepository(androidContext()) }
     single<VaultRepository> { VaultRepositoryImpl(get(), get()) }
+    single { ShareManager(androidContext(), get()) }
 
     // Git & Sync Singletons
     single { GitCredentialsStore(androidContext()) }
@@ -54,4 +57,5 @@ val appModule = module {
     viewModel { SettingsViewModel(get(), get()) }
     viewModel { GitViewModel(get(), get(), get()) }
     viewModel { (initialNotePath: String?) -> com.nool.app.ui.graph.GraphViewModel(get(), initialNotePath) }
+    viewModel { ShareViewModel(get(), get()) }
 }
