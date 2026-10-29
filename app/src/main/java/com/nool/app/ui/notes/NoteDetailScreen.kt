@@ -1,6 +1,7 @@
 package com.nool.app.ui.notes
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NoteAlt
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -89,6 +91,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nool.app.domain.model.VaultItem
+import com.nool.app.data.export.PdfExporter
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.MarkdownRenderer
 import com.nool.app.ui.editor.MarkdownToolbar
@@ -278,6 +281,23 @@ fun NoteDetailScreen(
                                 onClick = {
                                     menuExpanded = false
                                     viewModel.openVersionHistory()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export to PDF") },
+                                leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    menuExpanded = false
+                                    val result = PdfExporter.exportNoteToPdf(
+                                        context = context,
+                                        title = uiState.title,
+                                        content = uiState.content
+                                    )
+                                    result.onSuccess { file ->
+                                        PdfExporter.sharePdf(context, file)
+                                    }.onFailure { error ->
+                                        Toast.makeText(context, "PDF export failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             )
                             DropdownMenuItem(

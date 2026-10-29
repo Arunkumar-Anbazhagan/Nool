@@ -52,6 +52,7 @@ import com.nool.app.ui.share.ShareBottomSheet
 import com.nool.app.ui.share.ShareEvent
 import com.nool.app.ui.share.ShareViewModel
 import com.nool.app.ui.theme.NoolTheme
+import com.nool.app.widget.QuickNoteWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -72,10 +73,12 @@ class MainActivity : FragmentActivity() {
     private var backgroundTimestampMs = 0L
     private val isUnlockedState = mutableStateOf(true)
     private var isBiometricConfigured = false
+    private val pendingQuickNoteState = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleShareIntent(intent)
+        handleQuickNoteIntent(intent)
         enableEdgeToEdge()
 
         // Check if biometric lock is active at launch
@@ -126,6 +129,14 @@ class MainActivity : FragmentActivity() {
                 pureBlack = pureBlack
             ) {
                 val navController = rememberNavController()
+                val pendingQuickNote by pendingQuickNoteState
+
+                LaunchedEffect(pendingQuickNote, isUnlocked) {
+                    if (pendingQuickNote && isUnlocked) {
+                        navController.navigate(Screen.NoteDetail.createRoute(""))
+                        pendingQuickNoteState.value = false
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     shareViewModel.events.collectLatest { event ->
@@ -255,6 +266,16 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShareIntent(intent)
+        handleQuickNoteIntent(intent)
+    }
+
+    private fun handleQuickNoteIntent(intent: Intent?) {
+        if (intent == null) return
+        val isQuickNote = intent.getBooleanExtra(QuickNoteWidgetProvider.EXTRA_CREATE_QUICK_NOTE, false) ||
+                intent.action == QuickNoteWidgetProvider.ACTION_QUICK_NOTE
+        if (isQuickNote) {
+            pendingQuickNoteState.value = true
+        }
     }
 
     private fun handleShareIntent(intent: Intent?) {
