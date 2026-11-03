@@ -92,6 +92,7 @@ android {
 dependencies {
     implementation(project(":shared:core-model"))
     implementation(project(":shared:core-markdown"))
+    implementation(project(":shared:core-graph"))
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(libs.androidx.core.ktx)

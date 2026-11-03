@@ -24,6 +24,7 @@ kotlin {
     }
 
     sourceSets.getByName("commonTest").dependencies {
+        implementation(kotlin("test"))
         libs.findLibrary("kotlinx-coroutines-test").ifPresent { implementation(it) }
     }
 
