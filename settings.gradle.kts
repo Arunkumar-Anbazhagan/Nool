@@ -21,7 +21,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Nool"
-include(":app")
+include(":androidApp")
 include(":shared:core-model")
 include(":shared:core-markdown")
 include(":shared:core-graph")

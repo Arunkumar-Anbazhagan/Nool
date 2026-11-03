@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+base {
+    archivesName.set("app")
+}
+
 android {
     namespace = "com.nool.app"
     compileSdk = 35
