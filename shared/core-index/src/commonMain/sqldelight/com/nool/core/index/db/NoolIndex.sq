@@ -1,0 +1,141 @@
+CREATE TABLE notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relativePath TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    folderPath TEXT NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT NOT NULL,
+    lastModified INTEGER NOT NULL,
+    createdTimestamp INTEGER NOT NULL,
+    size INTEGER NOT NULL,
+    isPinned INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    isFavorite INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    isArchived INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    tags TEXT NOT NULL DEFAULT '',
+    aliases TEXT NOT NULL DEFAULT '',
+    noteType TEXT NOT NULL DEFAULT 'Note'
+);
+
+CREATE INDEX idx_notes_folder ON notes(folderPath);
+CREATE INDEX idx_notes_last_modified ON notes(lastModified);
+
+CREATE VIRTUAL TABLE note_fts USING fts5(
+    title,
+    content,
+    tags,
+    folderPath,
+    content='notes',
+    content_rowid='id',
+    prefix='2 3',
+    tokenize='unicode61'
+);
+
+-- Triggers for keeping FTS5 external content in sync
+CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
+    INSERT INTO note_fts(rowid, title, content, tags, folderPath)
+    VALUES (new.id, new.title, new.content, new.tags, new.folderPath);
+END;
+
+CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
+    INSERT INTO note_fts(note_fts, rowid, title, content, tags, folderPath)
+    VALUES ('delete', old.id, old.title, old.content, old.tags, old.folderPath);
+END;
+
+CREATE TRIGGER notes_au AFTER UPDATE ON notes BEGIN
+    INSERT INTO note_fts(note_fts, rowid, title, content, tags, folderPath)
+    VALUES ('delete', old.id, old.title, old.content, old.tags, old.folderPath);
+    INSERT INTO note_fts(rowid, title, content, tags, folderPath)
+    VALUES (new.id, new.title, new.content, new.tags, new.folderPath);
+END;
+
+CREATE TABLE links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sourcePath TEXT NOT NULL,
+    rawTarget TEXT NOT NULL,
+    targetTitle TEXT NOT NULL,
+    targetHeading TEXT,
+    alias TEXT,
+    isEmbed INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    resolvedPath TEXT
+);
+
+CREATE INDEX idx_links_source ON links(sourcePath);
+CREATE INDEX idx_links_target ON links(targetTitle);
+CREATE INDEX idx_links_resolved ON links(resolvedPath);
+
+-- Queries
+
+upsertNote:
+INSERT OR REPLACE INTO notes(
+    relativePath, title, folderPath, content, excerpt,
+    lastModified, createdTimestamp, size, isPinned, isFavorite, isArchived,
+    tags, aliases, noteType
+) VALUES (
+    ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?
+);
+
+deleteNote:
+DELETE FROM notes WHERE relativePath = ?;
+
+clearAllNotes:
+DELETE FROM notes;
+
+getNote:
+SELECT * FROM notes WHERE relativePath = ? LIMIT 1;
+
+getAllNotes:
+SELECT * FROM notes ORDER BY lastModified DESC;
+
+getActiveNotes:
+SELECT * FROM notes WHERE isArchived = 0 ORDER BY isPinned DESC, lastModified DESC;
+
+getNotesInFolder:
+SELECT * FROM notes WHERE folderPath = ? AND isArchived = 0 ORDER BY isPinned DESC, lastModified DESC;
+
+countNotes:
+SELECT COUNT(*) FROM notes;
+
+getAllTagsRaw:
+SELECT tags FROM notes WHERE isArchived = 0;
+
+getAllNoteTitlesAndPaths:
+SELECT title, relativePath, aliases FROM notes;
+
+searchFts:
+SELECT notes.* FROM notes
+JOIN note_fts ON notes.id = note_fts.rowid
+WHERE note_fts MATCH ?
+ORDER BY notes.isPinned DESC, notes.lastModified DESC;
+
+-- Links Queries
+
+insertLink:
+INSERT INTO links(
+    sourcePath, rawTarget, targetTitle, targetHeading, alias, isEmbed, resolvedPath
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?
+);
+
+deleteLinksForSource:
+DELETE FROM links WHERE sourcePath = ?;
+
+clearAllLinks:
+DELETE FROM links;
+
+getLinksFromSource:
+SELECT * FROM links WHERE sourcePath = ?;
+
+getAllLinks:
+SELECT * FROM links;
+
+getBacklinksForNote:
+SELECT * FROM links
+WHERE resolvedPath = :resolvedPath
+   OR (resolvedPath IS NULL AND LOWER(targetTitle) = LOWER(:targetTitle));
+
+getReferencingSourcePaths:
+SELECT DISTINCT sourcePath FROM links
+WHERE LOWER(targetTitle) = LOWER(:targetTitle)
+   OR resolvedPath = :resolvedPath;
