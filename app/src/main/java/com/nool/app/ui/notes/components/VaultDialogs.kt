@@ -36,7 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 
 @Composable
 fun CreateNoteDialog(

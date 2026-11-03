@@ -2,7 +2,7 @@ package com.nool.app.ui.trash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nool.app.domain.model.TrashedItem
+import com.nool.core.model.TrashedItem
 import com.nool.app.domain.repository.VaultRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -4,8 +4,8 @@ import com.nool.app.data.index.FrontmatterAndTagParser
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoteEntity
 import com.nool.app.data.index.SearchScope
-import com.nool.app.domain.model.TrashedItem
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.TrashedItem
+import com.nool.core.model.VaultItem
 import com.nool.app.domain.repository.VaultRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -220,7 +220,7 @@ class VaultRepositoryImpl(
     override suspend fun getGraphData(
         localNotePath: String?,
         localDepth: Int
-    ): Result<com.nool.app.domain.model.GraphData> = runCatching {
+    ): Result<com.nool.core.model.GraphData> = runCatching {
         indexManager.getGraphData(localNotePath, localDepth)
     }
 }

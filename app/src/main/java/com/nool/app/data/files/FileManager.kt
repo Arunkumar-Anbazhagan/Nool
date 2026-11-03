@@ -1,8 +1,8 @@
 package com.nool.app.data.files
 
 import android.content.Context
-import com.nool.app.domain.model.TrashedItem
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.TrashedItem
+import com.nool.core.model.VaultItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

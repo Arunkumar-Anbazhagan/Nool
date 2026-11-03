@@ -1,4 +1,4 @@
-package com.nool.app.domain.model
+package com.nool.core.model
 
 data class GraphNode(
     val id: String, // relativePath

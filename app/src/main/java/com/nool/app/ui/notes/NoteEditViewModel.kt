@@ -77,8 +77,8 @@ class NoteEditViewModel(
     private val gitRepository: com.nool.app.data.git.GitRepository? = null
 ) : ViewModel() {
 
-    private val _templates = MutableStateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>>(emptyList())
-    val templates: StateFlow<List<com.nool.app.domain.model.VaultItem.NoteItem>> = _templates.asStateFlow()
+    private val _templates = MutableStateFlow<List<com.nool.core.model.VaultItem.NoteItem>>(emptyList())
+    val templates: StateFlow<List<com.nool.core.model.VaultItem.NoteItem>> = _templates.asStateFlow()
 
     fun openVersionHistory() {
         _uiState.update { it.copy(showVersionHistory = true, isVersionHistoryLoading = true) }
@@ -151,7 +151,7 @@ class NoteEditViewModel(
         }
     }
 
-    fun insertTemplate(template: com.nool.app.domain.model.VaultItem.NoteItem) {
+    fun insertTemplate(template: com.nool.core.model.VaultItem.NoteItem) {
         viewModelScope.launch {
             templateManager?.applyTemplate(template.relativePath, _uiState.value.title)
                 ?.onSuccess { text ->

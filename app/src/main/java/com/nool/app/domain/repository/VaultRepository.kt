@@ -3,8 +3,8 @@ package com.nool.app.domain.repository
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoteEntity
 import com.nool.app.data.index.SearchScope
-import com.nool.app.domain.model.TrashedItem
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.TrashedItem
+import com.nool.core.model.VaultItem
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 import java.io.InputStream
@@ -55,5 +55,5 @@ interface VaultRepository {
     suspend fun convertUnlinkedMention(sourcePath: String, mentionText: String, targetNoteTitle: String): Result<Boolean>
     suspend fun getNoteCatalog(): Result<List<com.nool.app.data.index.NoteTitleAndPath>>
     suspend fun resolveWikiLink(rawTarget: String, sourceNotePath: String): Result<String?>
-    suspend fun getGraphData(localNotePath: String? = null, localDepth: Int = 1): Result<com.nool.app.domain.model.GraphData>
+    suspend fun getGraphData(localNotePath: String? = null, localDepth: Int = 1): Result<com.nool.core.model.GraphData>
 }

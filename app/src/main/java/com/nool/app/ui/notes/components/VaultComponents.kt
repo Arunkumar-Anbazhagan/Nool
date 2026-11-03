@@ -49,7 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 import com.nool.app.ui.notes.Breadcrumb
 import java.text.SimpleDateFormat
 import java.util.Date

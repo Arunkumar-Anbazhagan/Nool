@@ -428,12 +428,12 @@ class IndexManager(
     suspend fun getGraphData(
         localNotePath: String? = null,
         localDepth: Int = 1
-    ): com.nool.app.domain.model.GraphData = withContext(Dispatchers.IO) {
+    ): com.nool.core.model.GraphData = withContext(Dispatchers.IO) {
         val notes = indexDao.getAllNotes()
         val rawLinks = indexDao.getAllLinks()
 
         val allEdges = rawLinks.map { link ->
-            com.nool.app.domain.model.GraphEdge(
+            com.nool.core.model.GraphEdge(
                 source = link.sourcePath,
                 target = link.resolvedPath ?: link.targetTitle,
                 isEmbed = link.isEmbed,
@@ -480,7 +480,7 @@ class IndexManager(
         }
 
         val graphNodes = notes.filter { it.relativePath in keptNodeIds }.map { entity ->
-            com.nool.app.domain.model.GraphNode(
+            com.nool.core.model.GraphNode(
                 id = entity.relativePath,
                 label = entity.title,
                 folder = entity.folderPath,
@@ -492,7 +492,7 @@ class IndexManager(
             )
         }
 
-        com.nool.app.domain.model.GraphData(
+        com.nool.core.model.GraphData(
             nodes = graphNodes,
             edges = filteredEdges
         )

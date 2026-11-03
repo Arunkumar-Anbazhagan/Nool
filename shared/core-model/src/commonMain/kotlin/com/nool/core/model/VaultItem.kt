@@ -1,4 +1,4 @@
-package com.nool.app.domain.model
+package com.nool.core.model
 
 sealed interface VaultItem {
     val name: String

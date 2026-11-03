@@ -65,7 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 import com.nool.app.ui.components.expressive.FloatingPillNavDock
 import com.nool.app.ui.components.expressive.NavDockItem
 import com.nool.app.ui.components.expressive.ScallopedFlowerButton

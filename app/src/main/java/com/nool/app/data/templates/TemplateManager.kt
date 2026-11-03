@@ -1,6 +1,6 @@
 package com.nool.app.data.templates
 
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 import com.nool.app.domain.repository.VaultRepository
 import com.nool.app.settings.SettingsRepository
 import kotlinx.coroutines.Dispatchers

@@ -92,7 +92,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 import com.nool.app.data.export.PdfExporter
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.MarkdownRenderer

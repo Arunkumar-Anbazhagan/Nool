@@ -90,6 +90,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":shared:core-model"))
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(libs.androidx.core.ktx)

@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import com.nool.app.domain.model.GraphData
-import com.nool.app.domain.model.GraphNode
+import com.nool.core.model.GraphData
+import com.nool.core.model.GraphNode
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt

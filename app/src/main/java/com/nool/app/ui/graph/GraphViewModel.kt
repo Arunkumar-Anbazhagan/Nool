@@ -2,9 +2,9 @@ package com.nool.app.ui.graph
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nool.app.domain.model.GraphData
-import com.nool.app.domain.model.GraphFilter
-import com.nool.app.domain.model.GraphNode
+import com.nool.core.model.GraphData
+import com.nool.core.model.GraphFilter
+import com.nool.core.model.GraphNode
 import com.nool.app.domain.repository.VaultRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

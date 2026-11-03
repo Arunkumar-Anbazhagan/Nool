@@ -1,8 +1,8 @@
 package com.nool.app.ui.graph
 
-import com.nool.app.domain.model.GraphData
-import com.nool.app.domain.model.GraphEdge
-import com.nool.app.domain.model.GraphNode
+import com.nool.core.model.GraphData
+import com.nool.core.model.GraphEdge
+import com.nool.core.model.GraphNode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.cos

@@ -1,7 +1,7 @@
 package com.nool.app
 
 import com.nool.app.data.files.FileManager
-import com.nool.app.domain.model.VaultItem
+import com.nool.core.model.VaultItem
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
