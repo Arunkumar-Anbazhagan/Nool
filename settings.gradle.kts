@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -21,3 +22,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "Nool"
 include(":app")
+include(":shared:core-model")
+include(":shared:core-markdown")
+include(":shared:core-graph")
+include(":shared:core-templates")
+include(":shared:core-index")
