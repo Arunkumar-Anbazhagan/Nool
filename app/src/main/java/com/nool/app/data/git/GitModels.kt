@@ -73,3 +73,21 @@ enum class CloneStrategy {
     BACKUP_AND_CLEAN,
     CONNECT_AND_FETCH
 }
+
+enum class CloneJobStatus {
+    IDLE,
+    RUNNING,
+    SUCCESS,
+    FAILED
+}
+
+data class CloneJobState(
+    val url: String = "",
+    val subfolder: String = "",
+    val authType: String = "NONE",
+    val strategy: CloneStrategy = CloneStrategy.FAIL_IF_NOT_EMPTY,
+    val status: CloneJobStatus = CloneJobStatus.IDLE,
+    val phase: String = "",
+    val progress: Float = 0f,
+    val errorMessage: String? = null
+)

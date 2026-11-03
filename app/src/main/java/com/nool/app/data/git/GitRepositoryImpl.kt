@@ -197,20 +197,59 @@ class GitRepositoryImpl(
                 }
             }
 
-            // Normal clone into empty directory
-            val cloneCommand = Git.cloneRepository()
-                .setURI(remoteUrl)
-                .setDirectory(targetDir)
-                .setProgressMonitor(createProgressMonitor(onProgress))
+            // Resumable & idempotent clone using isolated staging directory
+            val stagingDir = File(vaultRoot, ".clone_staging_${System.currentTimeMillis()}")
+            // Clean up any stale staging folders
+            vaultRoot.listFiles()?.filter { it.name.startsWith(".clone_staging_") }?.forEach {
+                it.deleteRecursively()
+            }
 
-            configureAuth(cloneCommand, auth)
-            val git = cloneCommand.call()
-            git.close()
+            try {
+                val cloneCommand = Git.cloneRepository()
+                    .setURI(remoteUrl)
+                    .setDirectory(stagingDir)
+                    .setProgressMonitor(createProgressMonitor(onProgress))
 
-            credentialsStore.setRemoteUrl(remoteUrl)
-            credentialsStore.setRepoSubfolder(targetSubfolder)
-            ensureGitIgnore()
-            Unit
+                configureAuth(cloneCommand, auth)
+                val git = cloneCommand.call()
+                git.close()
+
+                if (!targetDir.exists()) {
+                    targetDir.mkdirs()
+                }
+
+                // Backup existing files if strategy is BACKUP_AND_CLEAN
+                if (existingFiles.isNotEmpty() && strategy == CloneStrategy.BACKUP_AND_CLEAN) {
+                    val backupDir = File(vaultRoot, ".trash/backup_${System.currentTimeMillis()}")
+                    backupDir.mkdirs()
+                    for (file in existingFiles) {
+                        file.renameTo(File(backupDir, file.name))
+                    }
+                }
+
+                // Atomically move or transfer staged contents into targetDir
+                val stagedItems = stagingDir.listFiles() ?: emptyArray()
+                for (item in stagedItems) {
+                    val dest = File(targetDir, item.name)
+                    if (dest.exists()) {
+                        dest.deleteRecursively()
+                    }
+                    val moved = item.renameTo(dest)
+                    if (!moved) {
+                        item.copyRecursively(dest, overwrite = true)
+                        item.deleteRecursively()
+                    }
+                }
+                stagingDir.deleteRecursively()
+
+                credentialsStore.setRemoteUrl(remoteUrl)
+                credentialsStore.setRepoSubfolder(targetSubfolder)
+                ensureGitIgnore()
+                Unit
+            } catch (e: Throwable) {
+                stagingDir.deleteRecursively()
+                throw e
+            }
         }.recoverCatching { mapException(it) }
     }
 

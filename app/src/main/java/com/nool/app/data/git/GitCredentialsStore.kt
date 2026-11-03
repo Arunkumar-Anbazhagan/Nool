@@ -56,6 +56,74 @@ class GitCredentialsStore(private val context: Context? = null) {
         private const val KEY_REMOTE_NAME = "remote_name"
         private const val KEY_ALLOW_SELF_SIGNED = "allow_self_signed"
         private const val KEY_REPO_SUBFOLDER = "repo_subfolder"
+        private const val KEY_CLONE_JOB_URL = "clone_job_url"
+        private const val KEY_CLONE_JOB_SUBFOLDER = "clone_job_subfolder"
+        private const val KEY_CLONE_JOB_AUTH_TYPE = "clone_job_auth_type"
+        private const val KEY_CLONE_JOB_STRATEGY = "clone_job_strategy"
+        private const val KEY_CLONE_JOB_STATUS = "clone_job_status"
+        private const val KEY_CLONE_JOB_PHASE = "clone_job_phase"
+        private const val KEY_CLONE_JOB_PROGRESS = "clone_job_progress"
+        private const val KEY_CLONE_JOB_ERROR = "clone_job_error"
+    }
+
+    fun saveCloneJobState(state: CloneJobState) {
+        getPrefs().edit()
+            .putString(KEY_CLONE_JOB_URL, state.url)
+            .putString(KEY_CLONE_JOB_SUBFOLDER, state.subfolder)
+            .putString(KEY_CLONE_JOB_AUTH_TYPE, state.authType)
+            .putString(KEY_CLONE_JOB_STRATEGY, state.strategy.name)
+            .putString(KEY_CLONE_JOB_STATUS, state.status.name)
+            .putString(KEY_CLONE_JOB_PHASE, state.phase)
+            .putFloat(KEY_CLONE_JOB_PROGRESS, state.progress)
+            .putString(KEY_CLONE_JOB_ERROR, state.errorMessage ?: "")
+            .apply()
+    }
+
+    fun getCloneJobState(): CloneJobState {
+        val prefs = getPrefs()
+        val url = prefs.getString(KEY_CLONE_JOB_URL, "") ?: ""
+        if (url.isBlank()) return CloneJobState()
+        val subfolder = prefs.getString(KEY_CLONE_JOB_SUBFOLDER, "") ?: ""
+        val authType = prefs.getString(KEY_CLONE_JOB_AUTH_TYPE, "NONE") ?: "NONE"
+        val strategyStr = prefs.getString(KEY_CLONE_JOB_STRATEGY, CloneStrategy.FAIL_IF_NOT_EMPTY.name)
+        val strategy = try {
+            CloneStrategy.valueOf(strategyStr ?: CloneStrategy.FAIL_IF_NOT_EMPTY.name)
+        } catch (_: Exception) {
+            CloneStrategy.FAIL_IF_NOT_EMPTY
+        }
+        val statusStr = prefs.getString(KEY_CLONE_JOB_STATUS, CloneJobStatus.IDLE.name)
+        val status = try {
+            CloneJobStatus.valueOf(statusStr ?: CloneJobStatus.IDLE.name)
+        } catch (_: Exception) {
+            CloneJobStatus.IDLE
+        }
+        val phase = prefs.getString(KEY_CLONE_JOB_PHASE, "") ?: ""
+        val progress = prefs.getFloat(KEY_CLONE_JOB_PROGRESS, 0f)
+        val error = prefs.getString(KEY_CLONE_JOB_ERROR, null).takeIf { !it.isNullOrBlank() }
+
+        return CloneJobState(
+            url = url,
+            subfolder = subfolder,
+            authType = authType,
+            strategy = strategy,
+            status = status,
+            phase = phase,
+            progress = progress,
+            errorMessage = error
+        )
+    }
+
+    fun clearCloneJobState() {
+        getPrefs().edit()
+            .remove(KEY_CLONE_JOB_URL)
+            .remove(KEY_CLONE_JOB_SUBFOLDER)
+            .remove(KEY_CLONE_JOB_AUTH_TYPE)
+            .remove(KEY_CLONE_JOB_STRATEGY)
+            .remove(KEY_CLONE_JOB_STATUS)
+            .remove(KEY_CLONE_JOB_PHASE)
+            .remove(KEY_CLONE_JOB_PROGRESS)
+            .remove(KEY_CLONE_JOB_ERROR)
+            .apply()
     }
 
     fun getRepoSubfolder(): String = getPrefs().getString(KEY_REPO_SUBFOLDER, "") ?: ""

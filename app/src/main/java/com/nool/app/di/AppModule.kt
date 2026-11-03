@@ -39,6 +39,7 @@ val appModule = module {
     // Git & Sync Singletons
     single { GitCredentialsStore(androidContext()) }
     single { GitCloneNotificationHelper(androidContext()) }
+    single { com.nool.app.sync.GitCloneManager(androidContext(), get()) }
     single { NetworkMonitor(androidContext()) }
     single<GitRepository> { GitRepositoryImpl(get<FileManager>().vaultRoot, get()) }
     single<SyncEngine> {
@@ -58,7 +59,7 @@ val appModule = module {
     viewModel { TrashViewModel(get()) }
     viewModel { (initialTag: String?, initialQuery: String?) -> SearchViewModel(get(), get(), initialTag, initialQuery) }
     viewModel { SettingsViewModel(get(), get()) }
-    viewModel { GitViewModel(get(), get(), get(), get()) }
+    viewModel { GitViewModel(get(), get(), get(), get(), get()) }
     viewModel { (initialNotePath: String?) -> com.nool.app.ui.graph.GraphViewModel(get(), initialNotePath) }
     viewModel { ShareViewModel(get(), get()) }
 }

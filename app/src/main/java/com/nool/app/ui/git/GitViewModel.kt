@@ -2,6 +2,8 @@ package com.nool.app.ui.git
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nool.app.data.git.CloneJobState
+import com.nool.app.data.git.CloneJobStatus
 import com.nool.app.data.git.CloneStrategy
 import com.nool.app.data.git.ConflictResolution
 import com.nool.app.data.git.GitAuth
@@ -12,6 +14,7 @@ import com.nool.app.data.git.GitCredentialsStore
 import com.nool.app.data.git.GitDiffEntry
 import com.nool.app.data.git.GitRepository
 import com.nool.app.data.git.GitStatus
+import com.nool.app.sync.GitCloneManager
 import com.nool.app.sync.SyncEngine
 import com.nool.app.sync.SyncLogEntry
 import com.nool.app.sync.SyncStatus
@@ -29,6 +32,7 @@ data class GitUiState(
     val isLoading: Boolean = false,
     val clonePhase: String = "",
     val cloneProgress: Float = 0f,
+    val cloneError: String? = null,
     val status: GitStatus = GitStatus(),
     val commits: List<GitCommit> = emptyList(),
     val branches: List<GitBranch> = emptyList(),
@@ -57,7 +61,8 @@ class GitViewModel(
     private val gitRepository: GitRepository,
     private val syncEngine: SyncEngine,
     private val credentialsStore: GitCredentialsStore,
-    private val cloneNotificationHelper: GitCloneNotificationHelper? = null
+    private val cloneNotificationHelper: GitCloneNotificationHelper? = null,
+    private val cloneManager: GitCloneManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GitUiState())
@@ -73,6 +78,60 @@ class GitViewModel(
         loadSettings()
         checkRepo()
         loadExistingFolders()
+        observeCloneJobState()
+    }
+
+    private fun observeCloneJobState() {
+        val persisted = cloneManager?.cloneJobState?.value ?: credentialsStore.getCloneJobState()
+        if (persisted.status == CloneJobStatus.FAILED) {
+            _uiState.update { it.copy(cloneError = persisted.errorMessage) }
+        }
+
+        cloneManager?.let { manager ->
+            viewModelScope.launch {
+                manager.cloneJobState.collect { job ->
+                    when (job.status) {
+                        CloneJobStatus.RUNNING -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = true,
+                                    clonePhase = job.phase,
+                                    cloneProgress = job.progress,
+                                    cloneError = null
+                                )
+                            }
+                        }
+                        CloneJobStatus.SUCCESS -> {
+                            _uiState.update {
+                                it.copy(
+                                    isRepo = true,
+                                    isLoading = false,
+                                    clonePhase = "Completed",
+                                    cloneProgress = 1f,
+                                    cloneError = null,
+                                    remoteUrl = job.url,
+                                    targetSubfolder = job.subfolder
+                                )
+                            }
+                            _events.emit(GitEvent.ShowMessage("Repository cloned successfully!"))
+                            _events.emit(GitEvent.RepoCloned)
+                            checkRepo()
+                        }
+                        CloneJobStatus.FAILED -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    clonePhase = "",
+                                    cloneProgress = 0f,
+                                    cloneError = job.errorMessage
+                                )
+                            }
+                        }
+                        CloneJobStatus.IDLE -> Unit
+                    }
+                }
+            }
+        }
     }
 
     fun loadSettings() {
@@ -216,12 +275,24 @@ class GitViewModel(
         auth: GitAuth,
         strategy: CloneStrategy = CloneStrategy.FAIL_IF_NOT_EMPTY
     ) {
+        val authTypeStr = when (auth) {
+            is GitAuth.Token -> "HTTPS"
+            is GitAuth.Ssh -> "SSH"
+            GitAuth.None -> "NONE"
+        }
+        if (cloneManager != null) {
+            _uiState.update { it.copy(isLoading = true, cloneError = null) }
+            cloneManager.startClone(remoteUrl, targetSubfolder, authTypeStr, strategy)
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isLoading = true,
                     clonePhase = "Connecting to remote...",
-                    cloneProgress = 0f
+                    cloneProgress = 0f,
+                    cloneError = null
                 )
             }
             cloneNotificationHelper?.showProgress("Connecting to remote...", 0f)
@@ -251,6 +322,7 @@ class GitViewModel(
                         isLoading = false,
                         clonePhase = "Completed",
                         cloneProgress = 1f,
+                        cloneError = null,
                         remoteUrl = remoteUrl,
                         targetSubfolder = targetSubfolder
                     )
@@ -260,17 +332,43 @@ class GitViewModel(
                 _events.emit(GitEvent.RepoCloned)
                 checkRepo()
             }.onFailure { error ->
+                val errorMessage = error.message ?: "Clone failed"
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         clonePhase = "",
-                        cloneProgress = 0f
+                        cloneProgress = 0f,
+                        cloneError = errorMessage
                     )
                 }
-                val errorMessage = error.message ?: "Clone failed"
                 cloneNotificationHelper?.showError(errorMessage)
                 _events.emit(GitEvent.ShowMessage("Clone failed: $errorMessage"))
             }
+        }
+    }
+
+    fun retryClone() {
+        val persisted = cloneManager?.cloneJobState?.value ?: credentialsStore.getCloneJobState()
+        if (persisted.url.isNotBlank()) {
+            val auth = when (persisted.authType) {
+                "HTTPS" -> {
+                    val token = credentialsStore.getHttpsToken()
+                    val user = credentialsStore.getHttpsUser()
+                    if (!token.isNullOrBlank()) GitAuth.Token(token, user) else GitAuth.None
+                }
+                "SSH" -> {
+                    val priv = credentialsStore.getSshPrivateKey() ?: ""
+                    val pass = credentialsStore.getSshPassphrase()
+                    GitAuth.Ssh(priv, pass)
+                }
+                else -> GitAuth.None
+            }
+            cloneRepository(
+                remoteUrl = persisted.url,
+                targetSubfolder = persisted.subfolder,
+                auth = auth,
+                strategy = persisted.strategy
+            )
         }
     }
 
