@@ -65,7 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nool.app.data.index.NoteEntity
-import com.nool.app.data.index.SearchScope
+import com.nool.core.model.SearchScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

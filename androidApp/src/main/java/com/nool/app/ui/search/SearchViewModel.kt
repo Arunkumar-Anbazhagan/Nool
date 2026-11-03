@@ -3,7 +3,7 @@ package com.nool.app.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nool.app.data.index.NoteEntity
-import com.nool.app.data.index.SearchScope
+import com.nool.core.model.SearchScope
 import com.nool.app.domain.repository.VaultRepository
 import com.nool.app.settings.SavedSearch
 import com.nool.app.settings.SettingsRepository
