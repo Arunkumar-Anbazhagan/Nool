@@ -2,7 +2,7 @@ package com.nool.app.domain.repository
 
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoteEntity
-import com.nool.app.data.index.SearchScope
+import com.nool.core.model.SearchScope
 import com.nool.core.model.TrashedItem
 import com.nool.core.model.VaultItem
 import kotlinx.coroutines.flow.Flow
@@ -50,10 +50,10 @@ interface VaultRepository {
     fun getAttachmentFile(relativePath: String): File
 
     // Links, Backlinks & Mentions
-    suspend fun getBacklinks(noteRelativePath: String): Result<List<com.nool.app.data.index.BacklinkItem>>
-    suspend fun getUnlinkedMentions(noteRelativePath: String): Result<List<com.nool.app.data.index.UnlinkedMentionItem>>
+    suspend fun getBacklinks(noteRelativePath: String): Result<List<com.nool.core.model.BacklinkItem>>
+    suspend fun getUnlinkedMentions(noteRelativePath: String): Result<List<com.nool.core.model.UnlinkedMentionItem>>
     suspend fun convertUnlinkedMention(sourcePath: String, mentionText: String, targetNoteTitle: String): Result<Boolean>
-    suspend fun getNoteCatalog(): Result<List<com.nool.app.data.index.NoteTitleAndPath>>
+    suspend fun getNoteCatalog(): Result<List<com.nool.core.model.NoteTitleAndPath>>
     suspend fun resolveWikiLink(rawTarget: String, sourceNotePath: String): Result<String?>
     suspend fun getGraphData(localNotePath: String? = null, localDepth: Int = 1): Result<com.nool.core.model.GraphData>
 }

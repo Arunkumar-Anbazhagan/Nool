@@ -94,6 +94,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nool.core.model.VaultItem
 import com.nool.app.data.export.PdfExporter
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.TableChart
+import com.nool.app.ui.editor.table.VisualTableEditorDialog
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.MarkdownRenderer
 import com.nool.app.ui.editor.MarkdownToolbar
@@ -102,6 +105,7 @@ import com.nool.app.ui.navigation.quickswitcher.QuickSwitcherDialog
 import com.nool.app.ui.notes.components.BacklinksSheet
 import com.nool.app.ui.notes.components.DeleteConfirmationDialog
 import com.nool.app.ui.notes.components.RenameDialog
+import com.nool.app.ui.notes.components.SlashCommandPopup
 import com.nool.app.ui.notes.components.WikiLinkAutocompletePopup
 import com.nool.app.ui.properties.FilePropertiesView
 import com.nool.app.ui.sidepanel.RightSidePanelDrawer
@@ -211,151 +215,177 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
-                    // Backlinks & Mentions sheet trigger
-                    val totalBacklinks = uiState.backlinks.size + uiState.unlinkedMentions.size
-                    IconButton(onClick = { viewModel.toggleBacklinksSheet() }) {
-                        BadgedBox(
-                            badge = {
-                                if (totalBacklinks > 0) {
-                                    Badge {
-                                        Text("$totalBacklinks")
-                                    }
-                                }
-                            }
-                        ) {
+                    if (uiState.isFocusMode) {
+                        IconButton(onClick = { viewModel.toggleFocusMode() }) {
                             Icon(
-                                imageVector = Icons.Default.Link,
-                                contentDescription = "Backlinks and mentions",
-                                tint = if (totalBacklinks > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                imageVector = Icons.Default.CenterFocusStrong,
+                                contentDescription = "Exit Focus Mode",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-
-                    // Local Graph Button
-                    IconButton(onClick = { onNavigateToGraph(uiState.relativePath) }) {
-                        Icon(
-                            imageVector = Icons.Default.Hub,
-                            contentDescription = "Local Graph",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    // Right Side Panel Context Drawer Toggle
-                    IconButton(onClick = { showRightSidePanel = !showRightSidePanel }) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Note Context & Properties",
-                            tint = if (showRightSidePanel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Preview Toggle Button
-                    IconButton(onClick = { viewModel.togglePreviewMode() }) {
-                        Icon(
-                            imageVector = if (uiState.isPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
-                            contentDescription = if (uiState.isPreviewMode) "Edit Mode" else "Preview Mode",
-                            tint = if (uiState.isPreviewMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Manual Save button
-                    if (uiState.saveStatus == SaveStatus.Saving) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .padding(2.dp)
-                        )
                     } else {
-                        IconButton(
-                            onClick = { viewModel.manualSave() },
-                            enabled = uiState.isDirty
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Save Note",
-                                tint = if (uiState.isDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-
-                    // Overflow Menu
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More options"
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Version History") },
-                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.openVersionHistory()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export to PDF") },
-                                leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                onClick = {
-                                    menuExpanded = false
-                                    val result = PdfExporter.exportNoteToPdf(
-                                        context = context,
-                                        title = uiState.title,
-                                        content = uiState.content
-                                    )
-                                    result.onSuccess { file ->
-                                        PdfExporter.sharePdf(context, file)
-                                    }.onFailure { error ->
-                                        Toast.makeText(context, "PDF export failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                        // Backlinks & Mentions sheet trigger
+                        val totalBacklinks = uiState.backlinks.size + uiState.unlinkedMentions.size
+                        IconButton(onClick = { viewModel.toggleBacklinksSheet() }) {
+                            BadgedBox(
+                                badge = {
+                                    if (totalBacklinks > 0) {
+                                        Badge {
+                                            Text("$totalBacklinks")
+                                        }
                                     }
                                 }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Link,
+                                    contentDescription = "Backlinks and mentions",
+                                    tint = if (totalBacklinks > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Local Graph Button
+                        IconButton(onClick = { onNavigateToGraph(uiState.relativePath) }) {
+                            Icon(
+                                imageVector = Icons.Default.Hub,
+                                contentDescription = "Local Graph",
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            DropdownMenuItem(
-                                text = { Text("Quick Switcher") },
-                                leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                                onClick = {
-                                    menuExpanded = false
-                                    showQuickSwitcher = true
-                                }
+                        }
+
+                        // Right Side Panel Context Drawer Toggle
+                        IconButton(onClick = { showRightSidePanel = !showRightSidePanel }) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Note Context & Properties",
+                                tint = if (showRightSidePanel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            DropdownMenuItem(
-                                text = { Text("Insert Template") },
-                                leadingIcon = { Icon(Icons.Default.NoteAlt, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.loadTemplates()
-                                    showTemplateDialog = true
-                                }
+                        }
+
+                        // Preview Toggle Button
+                        IconButton(onClick = { viewModel.togglePreviewMode() }) {
+                            Icon(
+                                imageVector = if (uiState.isPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
+                                contentDescription = if (uiState.isPreviewMode) "Edit Mode" else "Preview Mode",
+                                tint = if (uiState.isPreviewMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            DropdownMenuItem(
-                                text = { Text("Rename Note") },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.showRenameDialog()
-                                }
+                        }
+
+                        // Manual Save button
+                        if (uiState.saveStatus == SaveStatus.Saving) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(2.dp)
                             )
-                            DropdownMenuItem(
-                                text = { Text("Move to Trash", color = MaterialTheme.colorScheme.error) },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.showDeleteDialog()
-                                }
-                            )
+                        } else {
+                            IconButton(
+                                onClick = { viewModel.manualSave() },
+                                enabled = uiState.isDirty
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Save Note",
+                                    tint = if (uiState.isDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+
+                        // Overflow Menu
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (uiState.isFocusMode) "Exit Focus Mode" else "Focus Mode") },
+                                    leadingIcon = { Icon(Icons.Default.CenterFocusStrong, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.toggleFocusMode()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Insert Table (Visual)") },
+                                    leadingIcon = { Icon(Icons.Default.TableChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.showTableEditor()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Version History") },
+                                    leadingIcon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.openVersionHistory()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export to PDF") },
+                                    leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        val result = PdfExporter.exportNoteToPdf(
+                                            context = context,
+                                            title = uiState.title,
+                                            content = uiState.content
+                                        )
+                                        result.onSuccess { file ->
+                                            PdfExporter.sharePdf(context, file)
+                                        }.onFailure { error ->
+                                            Toast.makeText(context, "PDF export failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Quick Switcher") },
+                                    leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showQuickSwitcher = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Insert Template") },
+                                    leadingIcon = { Icon(Icons.Default.NoteAlt, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.loadTemplates()
+                                        showTemplateDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Rename Note") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.showRenameDialog()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Move to Trash", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.showDeleteDialog()
+                                    }
+                                )
+                            }
                         }
                     }
                 },
@@ -366,34 +396,61 @@ fun NoteDetailScreen(
         },
         bottomBar = {
             if (!uiState.isPreviewMode) {
-                MarkdownToolbar(
-                    canUndo = uiState.canUndo,
-                    canRedo = uiState.canRedo,
-                    onUndo = { viewModel.undo() },
-                    onRedo = { viewModel.redo() },
-                    onHeading = { viewModel.formatHeading() },
-                    onBold = { viewModel.formatBold() },
-                    onItalic = { viewModel.formatItalic() },
-                    onStrikethrough = { viewModel.formatStrikethrough() },
-                    onChecklist = { viewModel.formatChecklist() },
-                    onBulletList = { viewModel.formatBulletList() },
-                    onNumberedList = { viewModel.formatNumberedList() },
-                    onInlineCode = { viewModel.formatInlineCode() },
-                    onCodeBlock = { viewModel.formatCodeBlock() },
-                    onBlockquote = { viewModel.formatBlockquote() },
-                    onCallout = {
-                        viewModel.applyFormat { MarkdownFormattingHelper.insertCallout(it) }
-                    },
-                    onTable = { viewModel.formatTable() },
-                    onLink = { viewModel.formatLink() },
-                    onWikiLink = {
-                        viewModel.applyFormat { MarkdownFormattingHelper.insertWikiLink(it) }
-                    },
-                    onAttachImage = { imagePickerLauncher.launch("image/*") },
-                    onRecordAudio = {
-                        recordAudioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                val wordCount = remember(uiState.content) {
+                    uiState.content.split(Regex("\\s+")).count { it.isNotBlank() }
+                }
+                val charCount = uiState.content.length
+                val readingTimeMin = maxOf(1, Math.ceil(wordCount / 200.0).toInt())
+
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "$wordCount words • $charCount chars",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Text(
+                            text = "$readingTimeMin min read",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
-                )
+
+                    MarkdownToolbar(
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
+                        onUndo = { viewModel.undo() },
+                        onRedo = { viewModel.redo() },
+                        onHeading = { viewModel.formatHeading() },
+                        onBold = { viewModel.formatBold() },
+                        onItalic = { viewModel.formatItalic() },
+                        onStrikethrough = { viewModel.formatStrikethrough() },
+                        onChecklist = { viewModel.formatChecklist() },
+                        onBulletList = { viewModel.formatBulletList() },
+                        onNumberedList = { viewModel.formatNumberedList() },
+                        onInlineCode = { viewModel.formatInlineCode() },
+                        onCodeBlock = { viewModel.formatCodeBlock() },
+                        onBlockquote = { viewModel.formatBlockquote() },
+                        onCallout = {
+                            viewModel.applyFormat { MarkdownFormattingHelper.insertCallout(it) }
+                        },
+                        onTable = { viewModel.showTableEditor() },
+                        onLink = { viewModel.formatLink() },
+                        onWikiLink = {
+                            viewModel.applyFormat { MarkdownFormattingHelper.insertWikiLink(it) }
+                        },
+                        onAttachImage = { imagePickerLauncher.launch("image/*") },
+                        onRecordAudio = {
+                            recordAudioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                        }
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -480,6 +537,15 @@ fun NoteDetailScreen(
                             query = uiState.wikiLinkQuery,
                             suggestions = uiState.wikiLinkSuggestions,
                             onSelectSuggestion = { viewModel.insertWikiLinkSuggestion(it) },
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
+
+                        // Slash command popup
+                        SlashCommandPopup(
+                            visible = uiState.showSlashCommands,
+                            query = uiState.slashCommandQuery,
+                            commands = uiState.slashCommandSuggestions,
+                            onSelectCommand = { viewModel.insertSlashCommand(it) },
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
@@ -913,4 +979,10 @@ fun NoteDetailScreen(
             }
         )
     }
+
+    VisualTableEditorDialog(
+        visible = uiState.showTableEditorDialog,
+        onDismiss = { viewModel.dismissTableEditor() },
+        onInsertTable = { viewModel.insertTable(it) }
+    )
 }

@@ -22,18 +22,18 @@ Last Updated: 2026-11-03
 
 ---
 
-### Phase 1: Editor Upgrade
-- [ ] Timeboxed spike: CodeMirror 6 in WebView versus native Compose text editing. Judge on IME behavior, cursor stability, large files, live preview feasibility, Vim/Emacs modes, desktop reuse. Record the decision in `docs/DECISIONS.md`.
-- [ ] Interactive task checkboxes in preview (writes back to the file with minimal diffs).
-- [ ] Slash commands (tables, callouts, templates, headings, embeds).
-- [ ] Live preview (WYSIWYG-style) editing mode.
-- [ ] Offline KaTeX math (inline `$...$`, block `$$...$$`).
-- [ ] Code syntax highlighting (bundled, offline).
-- [ ] Footnotes and definition lists.
-- [ ] Visual table editor.
-- [ ] Paste handling (images to an attachments folder, HTML to Markdown).
-- [ ] Focus/typewriter mode, word count, reading time.
-- [ ] Preserve undo/redo, smart lists, toolbar, wikilink autocomplete.
+### Phase 1: Editor Upgrade (DONE - Tag: phase-1-done)
+- [x] Timeboxed spike: CodeMirror 6 in WebView versus native Compose text editing. Recorded ADR-004 in `docs/DECISIONS.md`.
+- [x] Interactive task checkboxes in preview (writes back to the file with minimal diffs).
+- [x] Slash commands (tables, callouts, templates, headings, embeds via `SlashCommandCatalog` and `SlashCommandPopup`).
+- [x] Live preview (WYSIWYG-style) editing mode.
+- [x] Offline KaTeX math (inline `$...$`, block `$$...$$` via `MathRenderer` & `MathBlockCard`).
+- [x] Code syntax highlighting (bundled, offline via `SyntaxHighlighter`).
+- [x] Footnotes and definition lists (CommonMark inline footnote annotation and definition list block styling).
+- [x] Visual table editor (`VisualTableEditorDialog`).
+- [x] Paste handling (images to an attachments folder, HTML to Markdown via `PasteHandler`).
+- [x] Focus/typewriter mode, word count, reading time.
+- [x] Preserve undo/redo, smart lists, toolbar, wikilink autocomplete.
 
 ---
 

@@ -191,11 +191,11 @@ class VaultRepositoryImpl(
         return fileManager.getAttachmentFile(relativePath)
     }
 
-    override suspend fun getBacklinks(noteRelativePath: String): Result<List<com.nool.app.data.index.BacklinkItem>> = runCatching {
+    override suspend fun getBacklinks(noteRelativePath: String): Result<List<com.nool.core.model.BacklinkItem>> = runCatching {
         indexManager.getBacklinks(noteRelativePath)
     }
 
-    override suspend fun getUnlinkedMentions(noteRelativePath: String): Result<List<com.nool.app.data.index.UnlinkedMentionItem>> = runCatching {
+    override suspend fun getUnlinkedMentions(noteRelativePath: String): Result<List<com.nool.core.model.UnlinkedMentionItem>> = runCatching {
         indexManager.getUnlinkedMentions(noteRelativePath)
     }
 
@@ -209,7 +209,7 @@ class VaultRepositoryImpl(
         success
     }
 
-    override suspend fun getNoteCatalog(): Result<List<com.nool.app.data.index.NoteTitleAndPath>> = runCatching {
+    override suspend fun getNoteCatalog(): Result<List<com.nool.core.model.NoteTitleAndPath>> = runCatching {
         indexManager.getNoteCatalog()
     }
 

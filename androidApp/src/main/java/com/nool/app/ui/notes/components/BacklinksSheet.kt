@@ -42,8 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nool.app.data.index.BacklinkItem
-import com.nool.app.data.index.UnlinkedMentionItem
+import com.nool.core.model.BacklinkItem
+import com.nool.core.model.UnlinkedMentionItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

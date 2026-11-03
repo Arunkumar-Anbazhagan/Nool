@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -159,9 +160,15 @@ private fun RenderBlockNode(
             RenderBlockQuote(node, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
         }
         is FencedCodeBlock -> {
-            if (node.info?.trim()?.equals("mermaid", ignoreCase = true) == true) {
+            val info = node.info?.trim()?.lowercase()
+            if (info == "mermaid") {
                 com.nool.app.ui.editor.mermaid.MermaidDiagramCard(
                     code = node.literal,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (info == "math" || info == "latex") {
+                com.nool.app.ui.editor.math.MathBlockCard(
+                    formula = node.literal,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
@@ -321,6 +328,17 @@ private fun RenderParagraph(
     if (firstChild is Image) {
         RenderImage(firstChild, vaultRoot)
         return
+    }
+
+    if (firstChild is org.commonmark.node.Text && paragraph.lastChild == firstChild) {
+        val rawText = firstChild.literal.trim()
+        if (rawText.startsWith("$$") && rawText.endsWith("$$") && rawText.length >= 4) {
+            com.nool.app.ui.editor.math.MathBlockCard(
+                formula = rawText,
+                modifier = Modifier.fillMaxWidth()
+            )
+            return
+        }
     }
 
     val context = LocalContext.current
@@ -704,6 +722,29 @@ private fun RenderCallout(
 @Composable
 private fun RenderCodeBlock(code: String, language: String?) {
     val clipboard = LocalClipboardManager.current
+    val keywordColor = MaterialTheme.colorScheme.primary
+    val stringColor = MaterialTheme.colorScheme.tertiary
+    val numberColor = MaterialTheme.colorScheme.secondary
+    val commentColor = MaterialTheme.colorScheme.outline
+    val typeColor = MaterialTheme.colorScheme.primary
+    val plainColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val annotatedString = remember(code, language, keywordColor, stringColor, numberColor, commentColor) {
+        val highlighted = com.nool.core.markdown.SyntaxHighlighter.highlight(code.trimEnd(), language)
+        buildAnnotatedString {
+            for (token in highlighted) {
+                when (token.type) {
+                    com.nool.core.markdown.SyntaxTokenType.KEYWORD -> withStyle(androidx.compose.ui.text.SpanStyle(color = keywordColor, fontWeight = FontWeight.Bold)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.STRING -> withStyle(androidx.compose.ui.text.SpanStyle(color = stringColor)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.NUMBER -> withStyle(androidx.compose.ui.text.SpanStyle(color = numberColor)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.COMMENT -> withStyle(androidx.compose.ui.text.SpanStyle(color = commentColor, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.TYPE_OR_CLASS -> withStyle(androidx.compose.ui.text.SpanStyle(color = typeColor, fontWeight = FontWeight.SemiBold)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.FUNCTION -> withStyle(androidx.compose.ui.text.SpanStyle(color = plainColor, fontWeight = FontWeight.Medium)) { append(token.text) }
+                    com.nool.core.markdown.SyntaxTokenType.PLAIN -> withStyle(androidx.compose.ui.text.SpanStyle(color = plainColor)) { append(token.text) }
+                }
+            }
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -738,10 +779,9 @@ private fun RenderCodeBlock(code: String, language: String?) {
             Spacer(modifier = Modifier.height(4.dp))
             Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 Text(
-                    text = code.trimEnd(),
+                    text = annotatedString,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontFamily = FontFamily.Monospace
                     )
                 )
             }
@@ -1091,12 +1131,12 @@ private fun appendNode(node: Node, builder: AnnotatedString.Builder, enableLinks
                 val literal = child.literal
                 val links = com.nool.core.markdown.WikiLinkParser.parseLinks(literal)
                 if (links.isEmpty()) {
-                    builder.append(literal)
+                    appendFormattedText(literal, builder)
                 } else {
                     var currentIndex = 0
                     for (link in links) {
                         if (link.startIndex > currentIndex) {
-                            builder.append(literal.substring(currentIndex, link.startIndex))
+                            appendFormattedText(literal.substring(currentIndex, link.startIndex), builder)
                         }
                         if (link.isEmbed) {
                             builder.pushStyle(
@@ -1125,7 +1165,7 @@ private fun appendNode(node: Node, builder: AnnotatedString.Builder, enableLinks
                         currentIndex = link.endIndex
                     }
                     if (currentIndex < literal.length) {
-                        builder.append(literal.substring(currentIndex))
+                        appendFormattedText(literal.substring(currentIndex), builder)
                     }
                 }
             }
@@ -1219,4 +1259,58 @@ private fun extractPlainText(node: Node): String {
     }
     traverse(node)
     return sb.toString()
+}
+
+private fun appendFormattedText(text: String, builder: AnnotatedString.Builder) {
+    if (!text.contains("$") && !text.contains("[^")) {
+        builder.append(text)
+        return
+    }
+
+    var index = 0
+    val tokenRegex = Regex("""(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)|\[\^([a-zA-Z0-9_-]+)\](?!:)""")
+    val matches = tokenRegex.findAll(text)
+
+    for (match in matches) {
+        if (match.range.first > index) {
+            builder.append(text.substring(index, match.range.first))
+        }
+
+        val mathGroup = match.groups[1]
+        val footnoteGroup = match.groups[2]
+
+        if (mathGroup != null) {
+            builder.pushStyle(
+                SpanStyle(
+                    fontFamily = FontFamily.Serif,
+                    fontStyle = FontStyle.Italic,
+                    background = Color(0x18BA68C8),
+                    color = Color(0xFF9C27B0),
+                    fontSize = 14.sp
+                )
+            )
+            builder.append(" ${mathGroup.value} ")
+            builder.pop()
+        } else if (footnoteGroup != null) {
+            val footnoteId = footnoteGroup.value
+            builder.pushStringAnnotation(tag = "FOOTNOTE", annotation = footnoteId)
+            builder.pushStyle(
+                SpanStyle(
+                    color = Color(0xFF6750A4),
+                    fontSize = 11.sp,
+                    baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            builder.append("[$footnoteId]")
+            builder.pop()
+            builder.pop()
+        }
+
+        index = match.range.last + 1
+    }
+
+    if (index < text.length) {
+        builder.append(text.substring(index))
+    }
 }

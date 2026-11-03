@@ -26,3 +26,15 @@
   3. Dual-phase resumable indexing with guarded deletion upon 100% completion.
 - **Decision**: Option 3. Run initial indexing into SQLDelight; keep progress in DataStore; only delete legacy `nool_index_cache.db` once full indexing is verified complete.
 - **Consequences**: Zero risk of half-migrated index or user search breakage.
+
+## ADR-004: Editor Technology Selection: Native Compose Text Architecture with Modular Interactive Live Elements
+- **Context**: Need a responsive, robust editor supporting Android IME, cursor stability, live preview elements (checkboxes, tables, callouts, math), desktop reuse without bloat, and Vim keybindings.
+- **Options Considered**:
+  1. **CodeMirror 6 in embedded WebView**:
+     - *Pros*: Battle-tested Live Preview (decorations), native Vim keybindings (`@replit/codemirror-vim`).
+     - *Cons*: WebView bridge on Android has IME desync / keyboard latency; Desktop requires bundling CEF/JCEF/Chromium (+100MB binary footprint); asynchronous bridge complicates undo/redo.
+  2. **Native Compose Text Architecture (`BasicTextField` / `TextFieldValue` + Compose Live Renderers)**:
+     - *Pros*: Zero binary bloat, 100% native IME and keyboard handles on Android and Desktop JVM, instantaneous keystroke processing, seamless Koin/StateFlow integration, shared Compose UI across mobile and desktop.
+     - *Cons*: Advanced modal Vim editing requires specialized key mapping.
+- **Decision**: Option 2. Build on Native Compose Text Architecture with an interactive editing toolbar, slash commands (`/` trigger), interactive preview with minimal-diff disk write-backs, offline syntax highlighting, and offline KaTeX math.
+- **Consequences**: Lightweight APK and Desktop bundles, flawless Android IME and cursor stability, 100% offline security, and shared UI across Android and Desktop.

@@ -4,9 +4,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nool.app.data.index.BacklinkItem
-import com.nool.app.data.index.NoteTitleAndPath
-import com.nool.app.data.index.UnlinkedMentionItem
+import com.nool.core.markdown.SlashCommand
+import com.nool.core.markdown.SlashCommandCatalog
+import com.nool.core.model.*
 import com.nool.app.domain.repository.VaultRepository
 import com.nool.app.ui.editor.MarkdownFormattingHelper
 import com.nool.app.ui.editor.UndoRedoManager
@@ -50,13 +50,18 @@ data class NoteEditUiState(
     val showWikiLinkSuggestions: Boolean = false,
     val wikiLinkQuery: String = "",
     val wikiLinkSuggestions: List<NoteTitleAndPath> = emptyList(),
+    val showSlashCommands: Boolean = false,
+    val slashCommandQuery: String = "",
+    val slashCommandSuggestions: List<SlashCommand> = emptyList(),
     val missingNoteToCreate: String? = null,
     val properties: List<PropertyItem> = emptyList(),
     val showVersionHistory: Boolean = false,
     val isVersionHistoryLoading: Boolean = false,
     val noteHistoryCommits: List<com.nool.app.data.git.GitCommit> = emptyList(),
     val previewCommit: com.nool.app.data.git.GitCommit? = null,
-    val previewCommitContent: String? = null
+    val previewCommitContent: String? = null,
+    val isFocusMode: Boolean = false,
+    val showTableEditorDialog: Boolean = false
 ) {
     val content: String get() = textFieldValue.text
     val isDirty: Boolean get() = textFieldValue.text != initialContent
@@ -214,7 +219,7 @@ class NoteEditViewModel(
             repository.getNoteCatalog().onSuccess { catalog ->
                 cachedCatalog = catalog
             }
-            repository.searchNotes("", scope = com.nool.app.data.index.SearchScope.ALL).onSuccess { notes ->
+            repository.searchNotes("", scope = SearchScope.ALL).onSuccess { notes ->
                 _allVaultNotes.value = notes
             }
         }
@@ -268,6 +273,24 @@ class NoteEditViewModel(
 
     fun onTextFieldValueChange(newVal: TextFieldValue) {
         val oldVal = _uiState.value.textFieldValue
+
+        // Automatic HTML to Markdown paste conversion
+        if (newVal.text.length > oldVal.text.length + 5) {
+            val insertedLength = newVal.text.length - oldVal.text.length
+            val insertionStart = newVal.selection.start - insertedLength
+            if (insertionStart >= 0 && insertionStart + insertedLength <= newVal.text.length) {
+                val insertedSnippet = newVal.text.substring(insertionStart, insertionStart + insertedLength)
+                if (com.nool.core.markdown.PasteHandler.isHtml(insertedSnippet)) {
+                    val converted = com.nool.core.markdown.PasteHandler.htmlToMarkdown(insertedSnippet)
+                    val before = newVal.text.substring(0, insertionStart)
+                    val after = newVal.text.substring(insertionStart + insertedLength)
+                    val updatedText = before + converted + after
+                    val updatedCursor = insertionStart + converted.length
+                    return onTextFieldValueChange(TextFieldValue(updatedText, TextRange(updatedCursor)))
+                }
+            }
+        }
+
         val smartVal = com.nool.app.ui.editor.MarkdownFormattingHelper.handleSmartEnter(oldVal, newVal) ?: newVal
         val isTextChanged = smartVal.text != oldVal.text
 
@@ -301,6 +324,27 @@ class NoteEditViewModel(
             }
         }
 
+        // Detect / slash command trigger
+        val lineStart = textUpToCursor.lastIndexOf('\n').let { if (it == -1) 0 else it + 1 }
+        val currentLineUpToCursor = textUpToCursor.substring(lineStart)
+        val slashIndex = currentLineUpToCursor.lastIndexOf('/')
+
+        var showSlash = false
+        var slashQ = ""
+        var slashSuggestions = emptyList<SlashCommand>()
+
+        if (!showSuggestions && slashIndex != -1) {
+            val beforeSlash = currentLineUpToCursor.substring(0, slashIndex)
+            if (beforeSlash.isEmpty() || beforeSlash.endsWith(" ")) {
+                val afterSlash = currentLineUpToCursor.substring(slashIndex + 1)
+                if (!afterSlash.contains(" ")) {
+                    showSlash = true
+                    slashQ = afterSlash
+                    slashSuggestions = SlashCommandCatalog.filter(slashQ).take(8)
+                }
+            }
+        }
+
         val (parsedProps, _) = if (isTextChanged) FilePropertiesHelper.parseProperties(smartVal.text) else (_uiState.value.properties to "")
 
         _uiState.update {
@@ -312,9 +356,30 @@ class NoteEditViewModel(
                 canRedo = undoRedoManager.canRedo,
                 showWikiLinkSuggestions = showSuggestions,
                 wikiLinkQuery = query,
-                wikiLinkSuggestions = suggestions
+                wikiLinkSuggestions = suggestions,
+                showSlashCommands = showSlash,
+                slashCommandQuery = slashQ,
+                slashCommandSuggestions = slashSuggestions
             )
         }
+    }
+
+    fun insertSlashCommand(command: SlashCommand) {
+        val current = _uiState.value.textFieldValue
+        val cursor = current.selection.start
+        val textUpToCursor = current.text.substring(0, cursor)
+        val lineStart = textUpToCursor.lastIndexOf('\n').let { if (it == -1) 0 else it + 1 }
+        val currentLineUpToCursor = textUpToCursor.substring(lineStart)
+        val slashIndexInLine = currentLineUpToCursor.lastIndexOf('/')
+        if (slashIndexInLine == -1) return
+        val absoluteSlashIndex = lineStart + slashIndexInLine
+
+        val before = current.text.substring(0, absoluteSlashIndex)
+        val after = current.text.substring(cursor)
+        val newText = before + command.snippet + after
+        val newCursor = absoluteSlashIndex + command.cursorOffset
+        val newTfv = TextFieldValue(newText, TextRange(newCursor))
+        onTextFieldValueChange(newTfv)
     }
 
     fun updateProperties(newProps: List<PropertyItem>) {
@@ -322,6 +387,27 @@ class NoteEditViewModel(
         val newContent = FilePropertiesHelper.updateProperties(currentText, newProps)
         val newTfv = TextFieldValue(newContent, TextRange(newContent.length))
         onTextFieldValueChange(newTfv)
+    }
+
+    fun toggleFocusMode() {
+        _uiState.update { it.copy(isFocusMode = !it.isFocusMode) }
+    }
+
+    fun showTableEditor() {
+        _uiState.update { it.copy(showTableEditorDialog = true) }
+    }
+
+    fun dismissTableEditor() {
+        _uiState.update { it.copy(showTableEditorDialog = false) }
+    }
+
+    fun insertTable(markdownTable: String) {
+        val current = _uiState.value.textFieldValue
+        val start = current.selection.start
+        val end = current.selection.end
+        val newText = current.text.replaceRange(start, end, markdownTable)
+        val newCursor = start + markdownTable.length
+        onTextFieldValueChange(TextFieldValue(newText, TextRange(newCursor)))
     }
 
     fun insertWikiLinkSuggestion(note: NoteTitleAndPath) {
