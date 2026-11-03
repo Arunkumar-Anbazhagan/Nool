@@ -93,6 +93,8 @@ dependencies {
     implementation(project(":shared:core-model"))
     implementation(project(":shared:core-markdown"))
     implementation(project(":shared:core-graph"))
+    implementation(project(":shared:core-templates"))
+    implementation(libs.kotlinx.datetime)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(libs.androidx.core.ktx)
