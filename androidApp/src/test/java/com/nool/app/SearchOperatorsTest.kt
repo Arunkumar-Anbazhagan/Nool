@@ -6,6 +6,7 @@ import com.nool.app.settings.SavedSearch
 import com.nool.app.settings.SettingsRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -110,6 +111,45 @@ class SearchOperatorsTest {
         val query = SearchQueryParser.parse("tag:android path:study \"Jetpack Compose\" -deprecated file:Guide")
         assertTrue(SearchQueryParser.matches(matchingNote, query))
         assertFalse(SearchQueryParser.matches(nonMatchingNote, query))
+    }
+
+    @Test
+    fun `folder and title operators match specifically`() {
+        val note1 = createTestNote("work/projects/alpha.md", "Project Alpha", folderPath = "work/projects")
+        val note2 = createTestNote("personal/journal.md", "Daily Log", folderPath = "personal")
+
+        val query1 = SearchQueryParser.parse("folder:work/projects title:Alpha")
+        assertTrue(SearchQueryParser.matches(note1, query1))
+        assertFalse(SearchQueryParser.matches(note2, query1))
+
+        val query2 = SearchQueryParser.parse("-folder:personal")
+        assertTrue(SearchQueryParser.matches(note1, query2))
+        assertFalse(SearchQueryParser.matches(note2, query2))
+    }
+
+    @Test
+    fun `hierarchical tag query matches sub-tags`() {
+        val note = createTestNote("n1.md", "Task", tags = "project/android/ui")
+        val queryParent = SearchQueryParser.parse("tag:project")
+        val queryMid = SearchQueryParser.parse("tag:project/android")
+        val queryExact = SearchQueryParser.parse("tag:project/android/ui")
+        val queryOther = SearchQueryParser.parse("tag:project/ios")
+
+        assertTrue(SearchQueryParser.matches(note, queryParent))
+        assertTrue(SearchQueryParser.matches(note, queryMid))
+        assertTrue(SearchQueryParser.matches(note, queryExact))
+        assertFalse(SearchQueryParser.matches(note, queryOther))
+    }
+
+    @Test
+    fun `toFtsMatchQuery generates valid FTS5 expressions`() {
+        val query = SearchQueryParser.parse("tag:android title:Guide \"hello world\" kotlin")
+        val fts = SearchQueryParser.toFtsMatchQuery(query)
+        assertNotNull(fts)
+        assertTrue(fts!!.contains("\"hello world\""))
+        assertTrue(fts.contains("kotlin*"))
+        assertTrue(fts.contains("tags: android*"))
+        assertTrue(fts.contains("title: guide*"))
     }
 
     @Test

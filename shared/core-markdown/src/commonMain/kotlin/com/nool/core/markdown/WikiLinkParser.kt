@@ -7,7 +7,9 @@ data class ParsedWikiLink(
     val heading: String?,
     val alias: String?,
     val startIndex: Int,
-    val endIndex: Int
+    val endIndex: Int,
+    val isBlockRef: Boolean = false,
+    val blockId: String? = null
 )
 
 object WikiLinkParser {
@@ -33,16 +35,20 @@ object WikiLinkParser {
                 alias = null
             }
 
-            // Handle heading: [[target#heading]]
+            // Handle heading or block ref: [[target#heading]] or [[target#^blockId]]
             val target: String
-            val heading: String?
+            val headingOrBlock: String?
             if (targetAndHeading.contains("#")) {
                 target = targetAndHeading.substringBefore("#").trim()
-                heading = targetAndHeading.substringAfter("#").trim().ifEmpty { null }
+                headingOrBlock = targetAndHeading.substringAfter("#").trim().ifEmpty { null }
             } else {
                 target = targetAndHeading
-                heading = null
+                headingOrBlock = null
             }
+
+            val isBlockRef = headingOrBlock?.startsWith("^") == true
+            val blockId = if (isBlockRef) headingOrBlock?.removePrefix("^")?.trim()?.ifEmpty { null } else null
+            val heading = if (isBlockRef) null else headingOrBlock
 
             ParsedWikiLink(
                 rawText = match.value,
@@ -51,7 +57,9 @@ object WikiLinkParser {
                 heading = heading,
                 alias = alias,
                 startIndex = match.range.first,
-                endIndex = match.range.last + 1
+                endIndex = match.range.last + 1,
+                isBlockRef = isBlockRef,
+                blockId = blockId
             )
         }.toList()
     }

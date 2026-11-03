@@ -107,7 +107,7 @@ searchFts:
 SELECT notes.* FROM notes
 JOIN note_fts ON notes.id = note_fts.rowid
 WHERE note_fts MATCH ?
-ORDER BY notes.isPinned DESC, notes.lastModified DESC;
+ORDER BY notes.isPinned DESC, bm25(note_fts) ASC, notes.lastModified DESC;
 
 -- Links Queries
 

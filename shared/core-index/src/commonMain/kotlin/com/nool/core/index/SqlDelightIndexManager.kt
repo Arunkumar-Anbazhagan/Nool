@@ -184,7 +184,16 @@ class SqlDelightIndexManager(
         val parsedQuery = SearchQueryParser.parse(trimmedQuery)
 
         val rawResults = if (parsedQuery.hasOperators) {
-            database.noolIndexQueries.getAllNotes().executeAsList().map { it.toIndexedNote() }
+            val ftsQuery = SearchQueryParser.toFtsMatchQuery(parsedQuery)
+            if (ftsQuery != null) {
+                try {
+                    database.noolIndexQueries.searchFts(ftsQuery).executeAsList().map { it.toIndexedNote() }
+                } catch (e: Exception) {
+                    database.noolIndexQueries.getAllNotes().executeAsList().map { it.toIndexedNote() }
+                }
+            } else {
+                database.noolIndexQueries.getAllNotes().executeAsList().map { it.toIndexedNote() }
+            }
         } else if (trimmedQuery.isNotEmpty()) {
             val ftsQuery = sanitizeFtsQuery(trimmedQuery)
             try {

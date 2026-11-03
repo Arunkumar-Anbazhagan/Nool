@@ -32,7 +32,11 @@ data class NotesUiState(
     val sortOption: SortOption = SortOption.MODIFIED_DESC,
     val showArchived: Boolean = false,
     val isLoading: Boolean = false,
-    val activeDialog: NotesDialogState? = null
+    val activeDialog: NotesDialogState? = null,
+    val notesOnThisDay: List<com.nool.app.data.index.NoteEntity> = emptyList(),
+    val existingNoteDates: Set<String> = emptySet(),
+    val tasks: List<com.nool.core.markdown.TaskItem> = emptyList(),
+    val dueFlashcards: List<Pair<com.nool.core.markdown.FlashcardItem, com.nool.core.markdown.CardReviewState?>> = emptyList()
 )
 
 sealed interface NotesDialogState {
@@ -42,6 +46,9 @@ sealed interface NotesDialogState {
     data class Move(val item: VaultItem, val folders: List<String>) : NotesDialogState
     data class Delete(val item: VaultItem) : NotesDialogState
     data object SortFilter : NotesDialogState
+    data object Calendar : NotesDialogState
+    data object Tasks : NotesDialogState
+    data object Flashcards : NotesDialogState
 }
 
 sealed interface NotesUiEvent {
@@ -55,7 +62,8 @@ class NotesViewModel(
     private val repository: VaultRepository,
     private val settingsRepository: SettingsRepository,
     initialFolder: String = "",
-    private val templateManager: com.nool.app.data.templates.TemplateManager? = null
+    private val templateManager: com.nool.app.data.templates.TemplateManager? = null,
+    private val flashcardManager: com.nool.app.data.flashcards.FlashcardManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotesUiState(currentFolder = initialFolder, isLoading = true))
@@ -110,10 +118,10 @@ class NotesViewModel(
         }
     }
 
-    fun openOrCreateDailyNote() {
+    fun openOrCreateDailyNote(date: java.util.Date = java.util.Date()) {
         viewModelScope.launch {
             if (templateManager != null) {
-                templateManager.getOrCreateDailyNote()
+                templateManager.getOrCreateDailyNote(date)
                     .onSuccess { path ->
                         _events.emit(NotesUiEvent.OpenNote(path))
                     }
@@ -122,12 +130,94 @@ class NotesViewModel(
                     }
             } else {
                 val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-                val today = dateFormat.format(java.util.Date())
+                val today = dateFormat.format(date)
                 val note = repository.createNote("", today, "# $today\n\n").getOrNull()
                 if (note != null) {
                     _events.emit(NotesUiEvent.OpenNote(note.relativePath))
                 }
             }
+        }
+    }
+
+    fun openOrCreateWeeklyNote(date: java.util.Date = java.util.Date()) {
+        viewModelScope.launch {
+            templateManager?.getOrCreateWeeklyNote(date)
+                ?.onSuccess { path ->
+                    _events.emit(NotesUiEvent.OpenNote(path))
+                }
+                ?.onFailure { error ->
+                    _events.emit(NotesUiEvent.ShowMessage("Failed to open weekly note: ${error.message}"))
+                }
+        }
+    }
+
+    fun showCalendar() {
+        viewModelScope.launch {
+            val onThisDay = templateManager?.getNotesOnThisDay() ?: emptyList()
+            val allNotes = repository.searchNotes("", scope = com.nool.core.model.SearchScope.ALL).getOrDefault(emptyList())
+            val dateRegex = Regex("""\b(\d{4}-\d{2}-\d{2})\b""")
+            val dates = mutableSetOf<String>()
+            val df = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            for (note in allNotes) {
+                val match = dateRegex.find(note.title)
+                if (match != null) {
+                    dates.add(match.value)
+                } else if (note.lastModified > 0) {
+                    dates.add(df.format(java.util.Date(note.lastModified)))
+                }
+            }
+            _uiState.update {
+                it.copy(
+                    activeDialog = NotesDialogState.Calendar,
+                    notesOnThisDay = onThisDay,
+                    existingNoteDates = dates
+                )
+            }
+        }
+    }
+
+    fun showTasks() {
+        viewModelScope.launch {
+            repository.getAllTasks().onSuccess { taskList ->
+                _uiState.update {
+                    it.copy(
+                        activeDialog = NotesDialogState.Tasks,
+                        tasks = taskList
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleTaskFromDashboard(task: com.nool.core.markdown.TaskItem, isChecked: Boolean) {
+        viewModelScope.launch {
+            repository.toggleTaskInFile(task.notePath, task.lineIndex, isChecked).onSuccess {
+                repository.getAllTasks().onSuccess { updated ->
+                    _uiState.update { it.copy(tasks = updated) }
+                }
+            }
+        }
+    }
+
+    fun showFlashcards() {
+        viewModelScope.launch {
+            val due = flashcardManager?.getDueFlashcards() ?: emptyList()
+            _uiState.update {
+                it.copy(
+                    activeDialog = NotesDialogState.Flashcards,
+                    dueFlashcards = due
+                )
+            }
+        }
+    }
+
+    fun recordFlashcardReview(
+        card: com.nool.core.markdown.FlashcardItem,
+        grade: com.nool.core.markdown.ReviewGrade,
+        state: com.nool.core.markdown.CardReviewState?
+    ) {
+        viewModelScope.launch {
+            flashcardManager?.recordReview(card.cardId, grade, state)
         }
     }
 

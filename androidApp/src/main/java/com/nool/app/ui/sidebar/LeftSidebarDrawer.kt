@@ -233,12 +233,25 @@ fun LeftSidebarDrawer(
                                 )
                             }
                         } else {
+                            val tagTree = remember(tagsWithCounts) {
+                                com.nool.core.model.TagHierarchyBuilder.buildTree(tagsWithCounts)
+                            }
+                            var expandedTagPaths by remember { mutableStateOf(setOf<String>()) }
+
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                items(tagsWithCounts.entries.toList(), key = { it.key }) { (tag, count) ->
-                                    TagRow(
-                                        tag = tag,
-                                        count = count,
-                                        onClick = { onSelectTag(tag) }
+                                items(tagTree, key = { it.fullPath }) { node ->
+                                    TagTreeItem(
+                                        node = node,
+                                        level = 0,
+                                        expandedNodes = expandedTagPaths,
+                                        onToggleExpand = { path ->
+                                            expandedTagPaths = if (expandedTagPaths.contains(path)) {
+                                                expandedTagPaths - path
+                                            } else {
+                                                expandedTagPaths + path
+                                            }
+                                        },
+                                        onSelectTag = onSelectTag
                                     )
                                 }
                             }
@@ -476,43 +489,79 @@ private fun BookmarkNoteRow(
 }
 
 @Composable
-private fun TagRow(
-    tag: String,
-    count: Int,
-    onClick: () -> Unit
+private fun TagTreeItem(
+    node: com.nool.core.model.TagTreeNode,
+    level: Int,
+    expandedNodes: Set<String>,
+    onToggleExpand: (String) -> Unit,
+    onSelectTag: (String) -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.Label,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "#$tag",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
+    val isExpanded = expandedNodes.contains(node.fullPath)
+    val hasChildren = node.children.isNotEmpty()
+
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelectTag(node.fullPath) }
+                .padding(start = (16 + level * 16).dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                if (hasChildren) {
+                    IconButton(
+                        onClick = { onToggleExpand(node.fullPath) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(24.dp))
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.Label,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "#${node.name}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest
+            ) {
+                val displayCount = if (hasChildren) node.totalCount else node.directCount
+                Text(
+                    text = "$displayCount",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
         }
 
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
-        ) {
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-            )
+        if (hasChildren && isExpanded) {
+            node.children.forEach { child ->
+                TagTreeItem(
+                    node = child,
+                    level = level + 1,
+                    expandedNodes = expandedNodes,
+                    onToggleExpand = onToggleExpand,
+                    onSelectTag = onSelectTag
+                )
+            }
         }
     }
 }

@@ -60,4 +60,87 @@ class TemplateManager(
             created.relativePath
         }
     }
+
+    suspend fun getOrCreateWeeklyNote(date: Date = Date()): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val folder = settingsRepository.dailyNotesFolder.first().let {
+                if (it.isEmpty()) "Weekly Notes" else "$it/Weekly"
+            }
+            val cal = java.util.Calendar.getInstance()
+            cal.time = date
+            val year = cal.get(java.util.Calendar.YEAR)
+            val week = cal.get(java.util.Calendar.WEEK_OF_YEAR)
+            val weekTitle = String.format("%04d-W%02d", year, week)
+            val expectedRelativePath = "$folder/$weekTitle.md"
+
+            val existingContent = vaultRepository.readNoteContent(expectedRelativePath).getOrNull()
+            if (existingContent != null) {
+                return@runCatching expectedRelativePath
+            }
+
+            val templates = getTemplates()
+            val weeklyTemplate = templates.find {
+                it.title.equals("Weekly Note", ignoreCase = true) ||
+                it.title.equals("Weekly", ignoreCase = true)
+            }
+
+            val rawTemplateContent = if (weeklyTemplate != null) {
+                vaultRepository.readNoteContent(weeklyTemplate.relativePath).getOrDefault("")
+            } else {
+                "# {{title}}\n\n## Weekly Goals\n- [ ] \n\n## Highlights\n\n## Review\n"
+            }
+
+            val finalContent = TemplateEngine.processTemplate(rawTemplateContent, weekTitle, date)
+            val created = vaultRepository.createNote(folder, weekTitle, finalContent).getOrThrow()
+            created.relativePath
+        }
+    }
+
+    suspend fun getNotesOnThisDay(date: Date = Date()): List<com.nool.app.data.index.NoteEntity> = withContext(Dispatchers.IO) {
+        val cal = java.util.Calendar.getInstance()
+        cal.time = date
+        val currentYear = cal.get(java.util.Calendar.YEAR)
+        val currentMonth = cal.get(java.util.Calendar.MONTH)
+        val currentDay = cal.get(java.util.Calendar.DAY_OF_MONTH)
+
+        val allNotes = vaultRepository.searchNotes("", scope = com.nool.core.model.SearchScope.ALL).getOrDefault(emptyList())
+
+        val noteCal = java.util.Calendar.getInstance()
+        allNotes.filter { note ->
+            var matched = false
+
+            // 1. Check title if it matches YYYY-MM-DD
+            val titleMatch = Regex("""^(\d{4})-(\d{2})-(\d{2})$""").matchEntire(note.title)
+            if (titleMatch != null) {
+                val y = titleMatch.groupValues[1].toIntOrNull() ?: 0
+                val m = (titleMatch.groupValues[2].toIntOrNull() ?: 0) - 1
+                val d = titleMatch.groupValues[3].toIntOrNull() ?: 0
+                if (y < currentYear && m == currentMonth && d == currentDay) {
+                    matched = true
+                }
+            }
+
+            // 2. Check createdTimestamp
+            if (!matched && note.createdTimestamp > 0) {
+                noteCal.timeInMillis = note.createdTimestamp
+                if (noteCal.get(java.util.Calendar.YEAR) < currentYear &&
+                    noteCal.get(java.util.Calendar.MONTH) == currentMonth &&
+                    noteCal.get(java.util.Calendar.DAY_OF_MONTH) == currentDay) {
+                    matched = true
+                }
+            }
+
+            // 3. Check lastModified
+            if (!matched && note.lastModified > 0) {
+                noteCal.timeInMillis = note.lastModified
+                if (noteCal.get(java.util.Calendar.YEAR) < currentYear &&
+                    noteCal.get(java.util.Calendar.MONTH) == currentMonth &&
+                    noteCal.get(java.util.Calendar.DAY_OF_MONTH) == currentDay) {
+                    matched = true
+                }
+            }
+
+            matched
+        }
+    }
 }

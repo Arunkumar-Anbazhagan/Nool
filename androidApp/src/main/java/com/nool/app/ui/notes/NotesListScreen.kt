@@ -21,12 +21,14 @@ import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -163,7 +165,7 @@ fun NotesListScreen(
                     },
                     onOpenDailyNote = {
                         scope.launch { drawerState.close() }
-                        viewModel.openOrCreateDailyNote()
+                        viewModel.showCalendar()
                     },
                     savedSearches = savedSearches,
                     onSelectSavedSearch = { query ->
@@ -265,6 +267,18 @@ fun NotesListScreen(
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search"
+                            )
+                        }
+                        IconButton(onClick = { viewModel.showTasks() }) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Tasks & Due Dates"
+                            )
+                        }
+                        IconButton(onClick = { viewModel.showFlashcards() }) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = "Flashcard Review"
                             )
                         }
                         IconButton(onClick = { viewModel.showSortFilterDialog() }) {
@@ -490,6 +504,33 @@ fun NotesListScreen(
                 onSortSelected = { viewModel.setSortOption(it) },
                 onToggleShowArchived = { viewModel.setShowArchived(it) },
                 onDismiss = { viewModel.dismissDialog() }
+            )
+        }
+        is NotesDialogState.Calendar -> {
+            com.nool.app.ui.calendar.CalendarViewDialog(
+                onDismissRequest = { viewModel.dismissDialog() },
+                onSelectDate = { date -> viewModel.openOrCreateDailyNote(date) },
+                onOpenWeeklyNote = { viewModel.openOrCreateWeeklyNote() },
+                onOpenNote = { path -> onNavigateToNote(path) },
+                existingNoteDates = uiState.existingNoteDates,
+                notesOnThisDay = uiState.notesOnThisDay
+            )
+        }
+        is NotesDialogState.Tasks -> {
+            com.nool.app.ui.tasks.TasksDashboardDialog(
+                tasks = uiState.tasks,
+                onToggleTask = { task, isChecked -> viewModel.toggleTaskFromDashboard(task, isChecked) },
+                onOpenNote = { path -> onNavigateToNote(path) },
+                onDismissRequest = { viewModel.dismissDialog() }
+            )
+        }
+        is NotesDialogState.Flashcards -> {
+            com.nool.app.ui.flashcards.FlashcardReviewDialog(
+                dueCards = uiState.dueFlashcards,
+                onRecordGrade = { card, grade, state ->
+                    viewModel.recordFlashcardReview(card, grade, state)
+                },
+                onDismissRequest = { viewModel.dismissDialog() }
             )
         }
         null -> Unit

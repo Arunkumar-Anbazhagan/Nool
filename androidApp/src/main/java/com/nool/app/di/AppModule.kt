@@ -42,6 +42,7 @@ val appModule = module {
     single<VaultRepository> { VaultRepositoryImpl(get(), get()) }
     single { ShareManager(androidContext(), get()) }
     single { com.nool.app.data.templates.TemplateManager(get(), get()) }
+    single { com.nool.app.data.flashcards.FlashcardManager(get()) }
 
     // Git & Sync Singletons
     single { GitCredentialsStore(androidContext()) }
@@ -61,7 +62,7 @@ val appModule = module {
     }
 
     // ViewModels
-    viewModel { (folder: String) -> NotesViewModel(get(), get(), folder, get()) }
+    viewModel { (folder: String) -> NotesViewModel(get(), get(), folder, get(), get()) }
     viewModel { (notePath: String) -> NoteEditViewModel(get(), notePath, get(), get()) }
     viewModel { TrashViewModel(get()) }
     viewModel { (initialTag: String?, initialQuery: String?) -> SearchViewModel(get(), get(), initialTag, initialQuery) }

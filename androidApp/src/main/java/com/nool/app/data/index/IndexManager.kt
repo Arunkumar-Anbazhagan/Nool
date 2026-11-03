@@ -208,6 +208,10 @@ class IndexManager(
         indexedNotes.map { it.toEntity() }
     }
 
+    suspend fun getAllNotes(): List<com.nool.core.model.IndexedNote> = withContext(Dispatchers.IO) {
+        sqlDelightManager.getAllNotes()
+    }
+
     suspend fun getAllTagsWithCounts(): Map<String, Int> = withContext(Dispatchers.IO) {
         sqlDelightManager.getAllTagsWithCounts()
     }

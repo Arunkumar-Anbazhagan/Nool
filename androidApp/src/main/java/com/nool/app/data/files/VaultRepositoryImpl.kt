@@ -224,4 +224,49 @@ class VaultRepositoryImpl(
     ): Result<com.nool.core.model.GraphData> = runCatching {
         indexManager.getGraphData(localNotePath, localDepth)
     }
+
+    override suspend fun getAllTasks(): Result<List<com.nool.core.markdown.TaskItem>> = runCatching {
+        val allNotes = indexManager.getAllNotes()
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val todayStr = dateFormat.format(java.util.Date())
+        val allTasks = mutableListOf<com.nool.core.markdown.TaskItem>()
+        for (note in allNotes) {
+            val tasks = com.nool.core.markdown.TaskParser.parseTasks(
+                notePath = note.relativePath,
+                noteTitle = note.title,
+                content = note.content,
+                todayStr = todayStr
+            )
+            allTasks.addAll(tasks)
+        }
+        allTasks
+    }
+
+    override suspend fun toggleTaskInFile(
+        noteRelativePath: String,
+        lineIndex: Int,
+        isChecked: Boolean
+    ): Result<Boolean> = runCatching {
+        val content = readNoteContent(noteRelativePath).getOrThrow()
+        val lines = content.lines().toMutableList()
+        if (lineIndex in lines.indices) {
+            val line = lines[lineIndex]
+            val updatedLine = if (isChecked) {
+                line.replaceFirst("- [ ] ", "- [x] ").replaceFirst("* [ ] ", "* [x] ").replaceFirst("+ [ ] ", "+ [x] ")
+            } else {
+                line.replaceFirst("- [x] ", "- [ ] ")
+                    .replaceFirst("- [X] ", "- [ ] ")
+                    .replaceFirst("* [x] ", "* [ ] ")
+                    .replaceFirst("* [X] ", "* [ ] ")
+                    .replaceFirst("+ [x] ", "+ [ ] ")
+                    .replaceFirst("+ [X] ", "+ [ ] ")
+            }
+            lines[lineIndex] = updatedLine
+            val newContent = lines.joinToString("\n")
+            saveNoteContent(noteRelativePath, newContent).getOrThrow()
+            true
+        } else {
+            false
+        }
+    }
 }

@@ -85,7 +85,22 @@ object LinkResolver {
         }
         if (aliasMatch != null) return aliasMatch.relativePath
 
-        // 4. Broken / Uncreated note
+        // 4. Folder note match (e.g. [[Projects]] resolving to Projects/Projects.md or Projects/_index.md)
+        val folderNoteMatch = allNotes.firstOrNull { note ->
+            val normPath = note.relativePath.replace('\\', '/')
+            val segs = normPath.removeSuffix(".md").split("/")
+            if (segs.size >= 2) {
+                val folder = segs[segs.size - 2]
+                val file = segs.last()
+                folder.equals(cleanTarget, ignoreCase = true) &&
+                    (file.equals(folder, ignoreCase = true) || file.equals("_index", ignoreCase = true) || file.equals("index", ignoreCase = true))
+            } else {
+                false
+            }
+        }
+        if (folderNoteMatch != null) return folderNoteMatch.relativePath
+
+        // 5. Broken / Uncreated note
         return null
     }
 }

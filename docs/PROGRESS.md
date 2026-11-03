@@ -37,18 +37,18 @@ Last Updated: 2026-11-03
 
 ---
 
-### Phase 2: Search, Linking, Knowledge
-- [ ] FTS5 search with ranking and prefix matching wired into the query parser (tags, title, path, content).
-- [ ] Block references (`[[Note#^id]]`) and heading links (`[[Note#Heading]]`), including embeds of a block or section.
-- [ ] Unlinked mentions with one-tap link.
-- [ ] Aliases (frontmatter aliases) and folder notes.
-- [ ] Tag hierarchy (`#a/b/c`) and a tag browser.
-- [ ] Local graph (neighbors, depth control, filters by tag/folder/property) alongside the global graph.
-- [ ] Saved searches / smart folders.
-- [ ] Daily/weekly notes, calendar view, "on this day".
-- [ ] Tasks aggregation with due dates (`📅 YYYY-MM-DD`) and WorkManager reminders on Android.
-- [ ] Spaced repetition (`Q:: A` and cloze deletions, review scheduling stored outside note bodies or in frontmatter, diff-friendly).
-- [ ] Incremental indexing: FileObserver (Android) and WatchService (desktop) behind `VaultWatcher`.
+### Phase 2: Search, Linking, Knowledge (DONE - Tag: phase-2-done)
+- [x] FTS5 search with ranking (`bm25`) and prefix matching wired into the query parser (tags, title, path, folder, content).
+- [x] Block references (`[[Note#^id]]`) and heading links (`[[Note#Heading]]`), including embeds of a block (`NoteEmbedHelper.extractBlock`) or section.
+- [x] Unlinked mentions with one-tap link conversion in Backlinks and right panel.
+- [x] Aliases (frontmatter aliases) and folder notes (`folder/folder.md`, `folder/_index.md`, `folder/index.md`) in `LinkResolver`.
+- [x] Tag hierarchy (`#a/b/c`) with `TagHierarchyBuilder`, `TagTreeNode`, and interactive nested tag browser in Left Sidebar.
+- [x] Local graph (neighbors, depth control, filters by tag/folder/property) alongside the global graph.
+- [x] Saved searches / smart folders with operator evaluation (`tag:`, `path:`, `folder:`, `title:`, `-exclude`, exact phrases).
+- [x] Daily/weekly notes (`TemplateManager.getOrCreateWeeklyNote`), month calendar view dialog, and "on this day" historical recall.
+- [x] Tasks aggregation with due dates (`📅 YYYY-MM-DD`), interactive task toggle dashboard, and WorkManager reminders on Android (`TaskReminderWorker`).
+- [x] Spaced repetition (`Q:: A` and cloze deletions, SM-2 scheduling stored in `.nool/reviews.json`, diff-friendly) with interactive review session dialog.
+- [x] Incremental indexing: `AndroidFileObserverVaultWatcher` (Android) and `JvmWatchServiceVaultWatcher` (desktop) behind `VaultWatcher`.
 
 ---
 

@@ -56,4 +56,8 @@ interface VaultRepository {
     suspend fun getNoteCatalog(): Result<List<com.nool.core.model.NoteTitleAndPath>>
     suspend fun resolveWikiLink(rawTarget: String, sourceNotePath: String): Result<String?>
     suspend fun getGraphData(localNotePath: String? = null, localDepth: Int = 1): Result<com.nool.core.model.GraphData>
+
+    // Tasks
+    suspend fun getAllTasks(): Result<List<com.nool.core.markdown.TaskItem>>
+    suspend fun toggleTaskInFile(noteRelativePath: String, lineIndex: Int, isChecked: Boolean): Result<Boolean>
 }

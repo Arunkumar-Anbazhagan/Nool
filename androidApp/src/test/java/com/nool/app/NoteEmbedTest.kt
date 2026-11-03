@@ -100,4 +100,73 @@ class NoteEmbedTest {
     fun `max recursion depth is capped at 3`() {
         assertEquals(3, NoteEmbedHelper.MAX_RECURSION_DEPTH)
     }
+
+    @Test
+    fun `extractBlock finds block by id and strips marker`() {
+        val markdown = """
+            # Header
+            
+            This is paragraph one.
+            
+            This is an important definition. ^def-123
+            
+            - List item 1
+            - List item 2 ^task-item
+        """.trimIndent()
+
+        val defBlock = NoteEmbedHelper.extractBlock(markdown, "^def-123")
+        assertNotNull(defBlock)
+        assertEquals("This is an important definition.", defBlock)
+
+        val taskBlock = NoteEmbedHelper.extractBlock(markdown, "task-item")
+        assertNotNull(taskBlock)
+        assertEquals("- List item 2", taskBlock)
+
+        val notFound = NoteEmbedHelper.extractBlock(markdown, "nonexistent")
+        assertNull(notFound)
+    }
+
+    @Test
+    fun `extractBlock handles standalone block marker on separate line`() {
+        val markdown = """
+            First line of block.
+            Second line of block.
+            ^my-block
+            
+            Next paragraph.
+        """.trimIndent()
+
+        val block = NoteEmbedHelper.extractBlock(markdown, "my-block")
+        assertNotNull(block)
+        assertEquals("First line of block.\nSecond line of block.", block)
+    }
+
+    @Test
+    fun `resolveNoteFile resolves folder notes`() {
+        val root = tempFolder.newFolder("vault2")
+        val projDir = File(root, "Projects").apply { mkdir() }
+        val projNote = File(projDir, "Projects.md").apply { writeText("# Projects Index") }
+
+        val resolved = NoteEmbedHelper.resolveNoteFile(root, "Projects")
+        assertNotNull(resolved)
+        assertEquals(projNote.absolutePath, resolved?.absolutePath)
+    }
+
+    @Test
+    fun `WikiLinkParser parses block references`() {
+        val text = "Check [[MyNote#^block-42]] and ![[Other#^sec-1|Custom Alias]]"
+        val links = com.nool.core.markdown.WikiLinkParser.parseLinks(text)
+        assertEquals(2, links.size)
+
+        assertEquals("MyNote", links[0].target)
+        assertTrue(links[0].isBlockRef)
+        assertEquals("block-42", links[0].blockId)
+        assertNull(links[0].heading)
+
+        assertEquals("Other", links[1].target)
+        assertTrue(links[1].isBlockRef)
+        assertEquals("sec-1", links[1].blockId)
+        assertEquals("Custom Alias", links[1].alias)
+        assertTrue(links[1].isEmbed)
+    }
 }

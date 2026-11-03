@@ -476,6 +476,8 @@ private fun RenderNoteEmbed(
     val embedMarkdown = remember(rawContent, headingTarget) {
         if (headingTarget.isNullOrBlank()) {
             rawContent
+        } else if (headingTarget.startsWith("^")) {
+            NoteEmbedHelper.extractBlock(rawContent, headingTarget) ?: rawContent
         } else {
             NoteEmbedHelper.extractHeadingSection(rawContent, headingTarget)
         }
