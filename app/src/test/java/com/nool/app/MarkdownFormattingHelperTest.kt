@@ -80,4 +80,36 @@ class MarkdownFormattingHelperTest {
         val attached = MarkdownFormattingHelper.insertAttachment(initial, "chart", "attachments/chart.png")
         assertEquals("![chart](attachments/chart.png)\n", attached.text)
     }
+
+    @Test
+    fun `test handleSmartEnter continues checklist and removes empty item`() {
+        val oldVal = TextFieldValue("- [ ] Milk", TextRange(10, 10))
+        val newVal = TextFieldValue("- [ ] Milk\n", TextRange(11, 11))
+        val continued = MarkdownFormattingHelper.handleSmartEnter(oldVal, newVal)
+        org.junit.Assert.assertNotNull(continued)
+        assertEquals("- [ ] Milk\n- [ ] ", continued!!.text)
+        assertEquals(17, continued.selection.start)
+
+        // Enter on empty checklist item should terminate list
+        val emptyOld = TextFieldValue("- [ ] Milk\n- [ ] ", TextRange(17, 17))
+        val emptyNew = TextFieldValue("- [ ] Milk\n- [ ] \n", TextRange(18, 18))
+        val terminated = MarkdownFormattingHelper.handleSmartEnter(emptyOld, emptyNew)
+        org.junit.Assert.assertNotNull(terminated)
+        assertEquals("- [ ] Milk\n", terminated!!.text)
+    }
+
+    @Test
+    fun `test handleSmartEnter continues bullet and numbered lists`() {
+        val oldBullet = TextFieldValue("- First item", TextRange(12, 12))
+        val newBullet = TextFieldValue("- First item\n", TextRange(13, 13))
+        val bulletCont = MarkdownFormattingHelper.handleSmartEnter(oldBullet, newBullet)
+        org.junit.Assert.assertNotNull(bulletCont)
+        assertEquals("- First item\n- ", bulletCont!!.text)
+
+        val oldNum = TextFieldValue("1. First step", TextRange(13, 13))
+        val newNum = TextFieldValue("1. First step\n", TextRange(14, 14))
+        val numCont = MarkdownFormattingHelper.handleSmartEnter(oldNum, newNum)
+        org.junit.Assert.assertNotNull(numCont)
+        assertEquals("1. First step\n2. ", numCont!!.text)
+    }
 }

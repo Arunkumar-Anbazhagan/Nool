@@ -41,6 +41,12 @@ class GitRepositoryImpl(
     init {
         // Register custom SSH Session Factory with mwiede JSch
         SshSessionFactory.setInstance(SshSessionFactoryImpl(credentialsStore))
+        // Explicitly register JDK HttpConnectionFactory to ensure HTTPS clones work reliably on Android
+        try {
+            org.eclipse.jgit.transport.HttpTransport.setConnectionFactory(
+                org.eclipse.jgit.transport.http.JDKHttpConnectionFactory()
+            )
+        } catch (_: Throwable) {}
     }
 
     private fun resolveDir(targetSubfolder: String): File {
@@ -611,12 +617,18 @@ class GitRepositoryImpl(
     private fun configureAuth(command: org.eclipse.jgit.api.TransportCommand<*, *>, auth: GitAuth) {
         when (auth) {
             is GitAuth.Token -> {
-                command.setCredentialsProvider(
-                    UsernamePasswordCredentialsProvider(auth.username, auth.token)
-                )
+                if (auth.token.isNotBlank()) {
+                    command.setCredentialsProvider(
+                        UsernamePasswordCredentialsProvider(auth.username, auth.token)
+                    )
+                } else {
+                    command.setCredentialsProvider(null)
+                }
             }
             is GitAuth.Ssh -> Unit // Handled automatically by registered SshSessionFactory
-            GitAuth.None -> Unit
+            GitAuth.None -> {
+                command.setCredentialsProvider(null)
+            }
         }
     }
 

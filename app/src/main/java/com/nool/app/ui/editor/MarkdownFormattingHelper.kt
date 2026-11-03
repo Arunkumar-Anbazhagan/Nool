@@ -171,4 +171,92 @@ object MarkdownFormattingHelper {
         val cursor = selection.start + finalSnippet.length
         return TextFieldValue(newText, TextRange(cursor, cursor))
     }
+
+    /**
+     * Smart continuation for list items, checklists, numbered lists, and quotes when Enter is pressed.
+     * When pressed on an empty item, it terminates the list by removing the empty prefix.
+     */
+    fun handleSmartEnter(oldVal: TextFieldValue, newVal: TextFieldValue): TextFieldValue? {
+        val oldText = oldVal.text
+        val newText = newVal.text
+
+        // Only handle when characters were inserted and a newline was just typed
+        if (newText.length <= oldText.length) return null
+        val cursor = newVal.selection.start
+        if (cursor <= 0 || newText[cursor - 1] != '\n') return null
+
+        // Ensure exactly one character (\n) was inserted at cursor - 1
+        val charsAdded = newText.length - oldText.length + oldVal.selection.length
+        if (charsAdded != 1) return null
+
+        val prevLineEnd = cursor - 1
+        val prevLineStart = newText.lastIndexOf('\n', prevLineEnd - 1) + 1
+        val prevLine = newText.substring(prevLineStart, prevLineEnd)
+
+        val indent = prevLine.takeWhile { it == ' ' || it == '\t' }
+
+        // 1. Checklist: "- [ ] " or "- [x] " or "- [X] "
+        val checklistMatch = Regex("""^(\s*)-\s*\[([ xX])\]\s*(.*)$""").find(prevLine)
+        if (checklistMatch != null) {
+            val content = checklistMatch.groupValues[3]
+            return if (content.isBlank()) {
+                val clearedText = newText.removeRange(prevLineStart, cursor)
+                TextFieldValue(clearedText, TextRange(prevLineStart))
+            } else {
+                val prefix = "$indent- [ ] "
+                val updatedText = newText.substring(0, cursor) + prefix + newText.substring(cursor)
+                val newCursor = cursor + prefix.length
+                TextFieldValue(updatedText, TextRange(newCursor))
+            }
+        }
+
+        // 2. Numbered list: "1. "
+        val numberedMatch = Regex("""^(\s*)(\d+)\.\s*(.*)$""").find(prevLine)
+        if (numberedMatch != null) {
+            val num = numberedMatch.groupValues[2].toIntOrNull() ?: 1
+            val content = numberedMatch.groupValues[3]
+            return if (content.isBlank()) {
+                val clearedText = newText.removeRange(prevLineStart, cursor)
+                TextFieldValue(clearedText, TextRange(prevLineStart))
+            } else {
+                val prefix = "$indent${num + 1}. "
+                val updatedText = newText.substring(0, cursor) + prefix + newText.substring(cursor)
+                val newCursor = cursor + prefix.length
+                TextFieldValue(updatedText, TextRange(newCursor))
+            }
+        }
+
+        // 3. Bullet list: "- " or "* " or "+ "
+        val bulletMatch = Regex("""^(\s*)([-*+])\s*(.*)$""").find(prevLine)
+        if (bulletMatch != null) {
+            val bullet = bulletMatch.groupValues[2]
+            val content = bulletMatch.groupValues[3]
+            return if (content.isBlank()) {
+                val clearedText = newText.removeRange(prevLineStart, cursor)
+                TextFieldValue(clearedText, TextRange(prevLineStart))
+            } else {
+                val prefix = "$indent$bullet "
+                val updatedText = newText.substring(0, cursor) + prefix + newText.substring(cursor)
+                val newCursor = cursor + prefix.length
+                TextFieldValue(updatedText, TextRange(newCursor))
+            }
+        }
+
+        // 4. Blockquote: "> "
+        val quoteMatch = Regex("""^(\s*)>\s*(.*)$""").find(prevLine)
+        if (quoteMatch != null) {
+            val content = quoteMatch.groupValues[2]
+            return if (content.isBlank()) {
+                val clearedText = newText.removeRange(prevLineStart, cursor)
+                TextFieldValue(clearedText, TextRange(prevLineStart))
+            } else {
+                val prefix = "$indent> "
+                val updatedText = newText.substring(0, cursor) + prefix + newText.substring(cursor)
+                val newCursor = cursor + prefix.length
+                TextFieldValue(updatedText, TextRange(newCursor))
+            }
+        }
+
+        return null
+    }
 }

@@ -125,8 +125,26 @@ fun GitSetupScreen(
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+
     LaunchedEffect(Unit) {
         viewModel.loadExistingFolders()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    LaunchedEffect(remoteUrl) {
+        val trimmed = remoteUrl.trim()
+        if (trimmed.startsWith("git@") || trimmed.startsWith("ssh://")) {
+            if (authType != "SSH") authType = "SSH"
+        } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            if (authType == "SSH") {
+                authType = if (token.isNotBlank()) "HTTPS" else "NONE"
+            }
+        }
     }
 
     LaunchedEffect(viewModel) {
@@ -309,19 +327,81 @@ fun GitSetupScreen(
                     }
                 }
 
+                if (uiState.isLoading) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (uiState.clonePhase.isNotBlank()) uiState.clonePhase else "Cloning repository...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val pct = (uiState.cloneProgress * 100).toInt()
+                                if (pct > 0) {
+                                    Text(
+                                        text = "$pct%",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            if (uiState.cloneProgress > 0f) {
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { uiState.cloneProgress.coerceIn(0f, 1f) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp),
+                                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp),
+                                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
                     onClick = {
                         val auth = when (authType) {
                             "HTTPS" -> {
-                                viewModel.setHttpsToken(token, tokenUser)
-                                GitAuth.Token(token = token, username = tokenUser)
+                                if (token.isNotBlank()) {
+                                    viewModel.setHttpsToken(token, tokenUser)
+                                    GitAuth.Token(token = token, username = tokenUser)
+                                } else {
+                                    GitAuth.None
+                                }
                             }
                             "SSH" -> GitAuth.Ssh(
                                 privateKey = uiState.sshPublicKey,
                                 knownHosts = null
                             )
+                            "NONE" -> GitAuth.None
                             else -> GitAuth.None
                         }
                         pendingAuth = auth

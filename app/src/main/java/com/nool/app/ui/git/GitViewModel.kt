@@ -6,6 +6,7 @@ import com.nool.app.data.git.CloneStrategy
 import com.nool.app.data.git.ConflictResolution
 import com.nool.app.data.git.GitAuth
 import com.nool.app.data.git.GitBranch
+import com.nool.app.data.git.GitCloneNotificationHelper
 import com.nool.app.data.git.GitCommit
 import com.nool.app.data.git.GitCredentialsStore
 import com.nool.app.data.git.GitDiffEntry
@@ -26,6 +27,8 @@ import kotlinx.coroutines.launch
 data class GitUiState(
     val isRepo: Boolean = false,
     val isLoading: Boolean = false,
+    val clonePhase: String = "",
+    val cloneProgress: Float = 0f,
     val status: GitStatus = GitStatus(),
     val commits: List<GitCommit> = emptyList(),
     val branches: List<GitBranch> = emptyList(),
@@ -53,7 +56,8 @@ sealed interface GitEvent {
 class GitViewModel(
     private val gitRepository: GitRepository,
     private val syncEngine: SyncEngine,
-    private val credentialsStore: GitCredentialsStore
+    private val credentialsStore: GitCredentialsStore,
+    private val cloneNotificationHelper: GitCloneNotificationHelper? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GitUiState())
@@ -213,25 +217,60 @@ class GitViewModel(
         strategy: CloneStrategy = CloneStrategy.FAIL_IF_NOT_EMPTY
     ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            gitRepository.clone(remoteUrl, targetSubfolder, auth, strategy)
-                .onSuccess {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    clonePhase = "Connecting to remote...",
+                    cloneProgress = 0f
+                )
+            }
+            cloneNotificationHelper?.showProgress("Connecting to remote...", 0f)
+
+            val repoDisplayName = targetSubfolder.ifBlank {
+                remoteUrl.trim().removeSuffix("/").removeSuffix(".git").substringAfterLast("/").ifBlank { "repository" }
+            }
+
+            gitRepository.clone(
+                remoteUrl = remoteUrl,
+                targetSubfolder = targetSubfolder,
+                auth = auth,
+                strategy = strategy,
+                onProgress = { phase, progress ->
                     _uiState.update {
                         it.copy(
-                            isRepo = true,
-                            isLoading = false,
-                            remoteUrl = remoteUrl,
-                            targetSubfolder = targetSubfolder
+                            clonePhase = phase,
+                            cloneProgress = progress
                         )
                     }
-                    _events.emit(GitEvent.ShowMessage("Repository cloned successfully!"))
-                    _events.emit(GitEvent.RepoCloned)
-                    checkRepo()
+                    cloneNotificationHelper?.showProgress(phase, progress)
                 }
-                .onFailure {
-                    _uiState.update { it.copy(isLoading = false) }
-                    _events.emit(GitEvent.ShowMessage("Clone failed: ${it.message}"))
+            ).onSuccess {
+                _uiState.update {
+                    it.copy(
+                        isRepo = true,
+                        isLoading = false,
+                        clonePhase = "Completed",
+                        cloneProgress = 1f,
+                        remoteUrl = remoteUrl,
+                        targetSubfolder = targetSubfolder
+                    )
                 }
+                cloneNotificationHelper?.showSuccess(repoDisplayName)
+                _events.emit(GitEvent.ShowMessage("Repository cloned successfully!"))
+                _events.emit(GitEvent.RepoCloned)
+                checkRepo()
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        clonePhase = "",
+                        cloneProgress = 0f
+                    )
+                }
+                val errorMessage = error.message ?: "Clone failed"
+                cloneNotificationHelper?.showError(errorMessage)
+                _events.emit(GitEvent.ShowMessage("Clone failed: $errorMessage"))
+            }
         }
     }
 

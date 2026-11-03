@@ -268,16 +268,17 @@ class NoteEditViewModel(
 
     fun onTextFieldValueChange(newVal: TextFieldValue) {
         val oldVal = _uiState.value.textFieldValue
-        val isTextChanged = newVal.text != oldVal.text
+        val smartVal = com.nool.app.ui.editor.MarkdownFormattingHelper.handleSmartEnter(oldVal, newVal) ?: newVal
+        val isTextChanged = smartVal.text != oldVal.text
 
         if (isTextChanged) {
-            undoRedoManager.push(newVal)
-            contentChangeFlow.value = newVal.text
+            undoRedoManager.push(smartVal)
+            contentChangeFlow.value = smartVal.text
         }
 
         // Detect [[ autocomplete trigger
-        val cursor = newVal.selection.start
-        val textUpToCursor = newVal.text.substring(0, cursor)
+        val cursor = smartVal.selection.start
+        val textUpToCursor = smartVal.text.substring(0, cursor)
         val lastOpen = textUpToCursor.lastIndexOf("[[")
 
         var showSuggestions = false
@@ -300,11 +301,11 @@ class NoteEditViewModel(
             }
         }
 
-        val (parsedProps, _) = if (isTextChanged) FilePropertiesHelper.parseProperties(newVal.text) else (_uiState.value.properties to "")
+        val (parsedProps, _) = if (isTextChanged) FilePropertiesHelper.parseProperties(smartVal.text) else (_uiState.value.properties to "")
 
         _uiState.update {
             it.copy(
-                textFieldValue = newVal,
+                textFieldValue = smartVal,
                 properties = parsedProps,
                 saveStatus = if (isTextChanged) SaveStatus.Unsaved else it.saveStatus,
                 canUndo = undoRedoManager.canUndo,
