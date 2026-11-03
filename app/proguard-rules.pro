@@ -21,9 +21,12 @@
 -keep class org.bouncycastle.** { *; }
 -dontwarn org.bouncycastle.**
 
-# Security Crypto
+# Security Crypto & Tink
 -keep class androidx.security.crypto.** { *; }
 -dontwarn androidx.security.crypto.**
+-dontwarn com.google.crypto.tink.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn org.slf4j.impl.**
 
 # WorkManager
 -keep class androidx.work.** { *; }
