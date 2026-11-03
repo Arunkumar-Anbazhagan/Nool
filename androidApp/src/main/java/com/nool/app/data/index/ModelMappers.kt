@@ -1,6 +1,5 @@
 package com.nool.app.data.index
 
-import com.nool.core.model.IndexedLink
 import com.nool.core.model.IndexedNote
 
 fun NoteEntity.toIndexedNote(): IndexedNote {
@@ -40,31 +39,5 @@ fun IndexedNote.toEntity(): NoteEntity {
         tags = tags.joinToString(","),
         aliases = aliases.joinToString(","),
         noteType = noteType
-    )
-}
-
-fun LinkEntity.toIndexedLink(): IndexedLink {
-    return IndexedLink(
-        id = id,
-        sourcePath = sourcePath,
-        rawTarget = rawTarget,
-        targetTitle = targetTitle,
-        targetHeading = targetHeading,
-        alias = alias,
-        isEmbed = isEmbed,
-        resolvedPath = resolvedPath
-    )
-}
-
-fun IndexedLink.toEntity(): LinkEntity {
-    return LinkEntity(
-        id = id,
-        sourcePath = sourcePath,
-        rawTarget = rawTarget,
-        targetTitle = targetTitle,
-        targetHeading = targetHeading,
-        alias = alias,
-        isEmbed = isEmbed,
-        resolvedPath = resolvedPath
     )
 }

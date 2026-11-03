@@ -1,9 +1,9 @@
 package com.nool.app
 
-import com.nool.app.data.index.FrontmatterAndTagParser
-import com.nool.app.data.index.LinkResolver
-import com.nool.app.data.index.NoteTitleAndPath
-import com.nool.app.data.index.WikiLinkParser
+import com.nool.core.markdown.FrontmatterAndTagParser
+import com.nool.core.index.LinkResolver
+import com.nool.core.model.NoteTitleAndPath
+import com.nool.core.markdown.WikiLinkParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull

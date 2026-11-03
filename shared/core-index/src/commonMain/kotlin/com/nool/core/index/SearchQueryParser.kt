@@ -127,8 +127,8 @@ object SearchQueryParser {
             if (noteTitleLower.contains(exPhraseLower) || noteContentLower.contains(exPhraseLower)) return false
         }
         for (exTerm in query.excludeTerms) {
-            val exTermLower = exTerm.lowercase()
-            if (noteTitleLower.contains(exTermLower) || noteContentLower.contains(exTermLower) || noteTags.contains(exTermLower)) return false
+            val exTermLower = exTerm.lowercase().trimEnd('*')
+            if (noteTitleLower.contains(exTermLower) || noteContentLower.contains(exTermLower) || noteTags.any { it.contains(exTermLower) }) return false
         }
         for (inTag in query.includeTags) {
             if (!noteTags.contains(inTag)) return false
@@ -144,10 +144,10 @@ object SearchQueryParser {
             if (!noteTitleLower.contains(phraseLower) && !noteContentLower.contains(phraseLower)) return false
         }
         for (term in query.includeTerms) {
-            val termLower = term.lowercase()
+            val termLower = term.lowercase().trimEnd('*')
             val inTitle = noteTitleLower.contains(termLower)
             val inContent = noteContentLower.contains(termLower)
-            val inTags = noteTags.contains(termLower)
+            val inTags = noteTags.any { it.contains(termLower) }
             if (!inTitle && !inContent && !inTags) return false
         }
 

@@ -1,6 +1,6 @@
 package com.nool.app
 
-import com.nool.app.data.index.FrontmatterAndTagParser
+import com.nool.core.markdown.FrontmatterAndTagParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

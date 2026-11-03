@@ -2,8 +2,11 @@ package com.nool.app
 
 import com.nool.app.data.files.FileManager
 import com.nool.app.data.files.VaultRepositoryImpl
+import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.nool.core.index.SqlDelightIndexManager
+import com.nool.core.index.db.NoolDatabase
 import com.nool.app.data.index.IndexManager
-import com.nool.app.data.templates.TemplateEngine
+import com.nool.core.templates.TemplateEngine
 import com.nool.app.data.templates.TemplateManager
 import com.nool.app.settings.SettingsRepository
 import kotlinx.coroutines.flow.flowOf
@@ -34,8 +37,9 @@ class TemplateManagerTest {
     fun setup() {
         vaultDir = tempFolder.newFolder("template_vault")
         fileManager = FileManager(customVaultDir = vaultDir)
-        val fakeIndexDao = FakeIndexDao()
-        indexManager = IndexManager(vaultDir, fakeIndexDao)
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also { NoolDatabase.Schema.create(it) }
+        val sqlDelightManager = SqlDelightIndexManager(NoolDatabase(driver))
+        indexManager = IndexManager(vaultDir, sqlDelightManager)
         repository = VaultRepositoryImpl(fileManager, indexManager)
     }
 

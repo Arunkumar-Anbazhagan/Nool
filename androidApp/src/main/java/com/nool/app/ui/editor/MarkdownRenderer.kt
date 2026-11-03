@@ -1089,7 +1089,7 @@ private fun appendNode(node: Node, builder: AnnotatedString.Builder, enableLinks
         when (child) {
             is org.commonmark.node.Text -> {
                 val literal = child.literal
-                val links = com.nool.app.data.index.WikiLinkParser.parseLinks(literal)
+                val links = com.nool.core.markdown.WikiLinkParser.parseLinks(literal)
                 if (links.isEmpty()) {
                     builder.append(literal)
                 } else {

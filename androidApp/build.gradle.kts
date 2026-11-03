@@ -133,11 +133,6 @@ dependencies {
     implementation(libs.commonmark.ext.gfm.tables)
     implementation(libs.commonmark.ext.gfm.strikethrough)
 
-    // Room (Derived Index)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
     // DataStore (Settings)
     implementation(libs.androidx.datastore.preferences)
 

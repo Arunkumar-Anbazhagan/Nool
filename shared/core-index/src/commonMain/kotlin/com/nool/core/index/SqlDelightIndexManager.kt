@@ -325,7 +325,10 @@ class SqlDelightIndexManager(
         val sanitized = query.replace("\"", "\"\"").replace("'", "''")
         val terms = sanitized.split(Regex("\\s+")).filter { it.isNotBlank() }
         if (terms.isEmpty()) return "*"
-        return terms.joinToString(" ") { "$it*" }
+        return terms.joinToString(" ") { term ->
+            val clean = term.trimEnd('*')
+            if (clean.isNotEmpty()) "$clean*" else "*"
+        }
     }
 
     private fun extractExcerpt(text: String, maxChars: Int = 120): String {

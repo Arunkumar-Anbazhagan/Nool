@@ -8,15 +8,19 @@ import kotlin.test.assertTrue
 
 class NoolDatabaseTest {
 
-    private fun createInMemoryDatabase(): NoolDatabase {
+    private fun createInMemoryDatabase(): Pair<NoolDatabase, JdbcSqliteDriver> {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         NoolDatabase.Schema.create(driver)
-        return NoolDatabase(driver)
+        return Pair(NoolDatabase(driver), driver)
+    }
+
+    private fun checkFtsIntegrity(driver: JdbcSqliteDriver) {
+        driver.execute(null, "INSERT INTO note_fts(note_fts) VALUES('integrity-check')", 0)
     }
 
     @Test
     fun testInsertNoteAndFtsTriggers() {
-        val db = createInMemoryDatabase()
+        val (db, _) = createInMemoryDatabase()
         val queries = db.noolIndexQueries
 
         queries.upsertNote(
@@ -54,7 +58,7 @@ class NoolDatabaseTest {
 
     @Test
     fun testUpdateNoteTriggerUpdatesFts() {
-        val db = createInMemoryDatabase()
+        val (db, _) = createInMemoryDatabase()
         val queries = db.noolIndexQueries
 
         queries.upsertNote(
@@ -104,7 +108,7 @@ class NoolDatabaseTest {
 
     @Test
     fun testDeleteNoteTriggerRemovesFromFts() {
-        val db = createInMemoryDatabase()
+        val (db, _) = createInMemoryDatabase()
         val queries = db.noolIndexQueries
 
         queries.upsertNote(
@@ -133,8 +137,81 @@ class NoolDatabaseTest {
     }
 
     @Test
+    fun testFtsIntegrityCheckAfterMutations() {
+        val (db, driver) = createInMemoryDatabase()
+        val queries = db.noolIndexQueries
+
+        // 1. Initial Insert
+        queries.upsertNote(
+            relativePath = "Notes/Doc1.md",
+            title = "Doc 1",
+            folderPath = "Notes",
+            content = "Initial content of doc one with keyword apple",
+            excerpt = "Initial content...",
+            lastModified = 1000L,
+            createdTimestamp = 1000L,
+            size = 45L,
+            isPinned = false,
+            isFavorite = false,
+            isArchived = false,
+            tags = "fruit",
+            aliases = "",
+            noteType = "Note"
+        )
+        checkFtsIntegrity(driver)
+
+        // 2. Edit / Update
+        queries.upsertNote(
+            relativePath = "Notes/Doc1.md",
+            title = "Doc 1 Modified",
+            folderPath = "Notes",
+            content = "Edited content of doc one with keyword banana",
+            excerpt = "Edited content...",
+            lastModified = 2000L,
+            createdTimestamp = 1000L,
+            size = 46L,
+            isPinned = true,
+            isFavorite = false,
+            isArchived = false,
+            tags = "yellow-fruit",
+            aliases = "",
+            noteType = "Note"
+        )
+        checkFtsIntegrity(driver)
+        assertEquals(0, queries.searchFts("apple*").executeAsList().size)
+        assertEquals(1, queries.searchFts("banana*").executeAsList().size)
+
+        // 3. Rename (Delete old path + insert new path)
+        queries.deleteNote("Notes/Doc1.md")
+        queries.upsertNote(
+            relativePath = "Notes/RenamedDoc1.md",
+            title = "Renamed Doc 1",
+            folderPath = "Notes",
+            content = "Renamed content with keyword cherry",
+            excerpt = "Renamed content...",
+            lastModified = 3000L,
+            createdTimestamp = 1000L,
+            size = 40L,
+            isPinned = false,
+            isFavorite = false,
+            isArchived = false,
+            tags = "red-fruit",
+            aliases = "",
+            noteType = "Note"
+        )
+        checkFtsIntegrity(driver)
+        assertEquals(0, queries.searchFts("banana*").executeAsList().size)
+        assertEquals(1, queries.searchFts("cherry*").executeAsList().size)
+
+        // 4. Delete
+        queries.deleteNote("Notes/RenamedDoc1.md")
+        checkFtsIntegrity(driver)
+        assertEquals(0, queries.searchFts("cherry*").executeAsList().size)
+    }
+
+    @Test
     fun testLinksAndBacklinksQueries() {
-        val db = createInMemoryDatabase()
+        val (db, _) = createInMemoryDatabase()
         val queries = db.noolIndexQueries
 
         queries.insertLink(

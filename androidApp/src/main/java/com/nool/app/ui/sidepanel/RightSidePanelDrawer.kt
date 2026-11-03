@@ -58,9 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nool.app.data.index.BacklinkItem
-import com.nool.app.data.index.ParsedWikiLink
 import com.nool.app.data.index.UnlinkedMentionItem
-import com.nool.app.data.index.WikiLinkParser
+import com.nool.core.markdown.ParsedWikiLink
+import com.nool.core.markdown.WikiLinkParser
 import com.nool.app.ui.properties.FilePropertiesView
 import com.nool.app.ui.properties.PropertyItem
 

@@ -1,7 +1,7 @@
 package com.nool.app
 
-import com.nool.app.data.index.NoteEntity
-import com.nool.app.data.index.SearchQueryParser
+import com.nool.core.model.IndexedNote
+import com.nool.core.index.SearchQueryParser
 import com.nool.app.settings.SavedSearch
 import com.nool.app.settings.SettingsRepository
 import org.junit.Assert.assertEquals
@@ -17,7 +17,8 @@ class SearchOperatorsTest {
         content: String = "",
         tags: String = "",
         folderPath: String = ""
-    ) = NoteEntity(
+    ) = IndexedNote(
+        id = 0,
         relativePath = path,
         title = title,
         folderPath = folderPath,
@@ -26,7 +27,7 @@ class SearchOperatorsTest {
         lastModified = 1000L,
         createdTimestamp = 1000L,
         size = 100L,
-        tags = tags
+        tags = tags.split(",").filter { it.isNotBlank() }
     )
 
     @Test

@@ -1,6 +1,7 @@
 package com.nool.app.data.files
 
-import com.nool.app.data.index.FrontmatterAndTagParser
+import com.nool.core.markdown.FrontmatterAndTagParser
+import com.nool.core.index.LinkResolver
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoteEntity
 import com.nool.app.data.index.SearchScope
@@ -214,7 +215,7 @@ class VaultRepositoryImpl(
 
     override suspend fun resolveWikiLink(rawTarget: String, sourceNotePath: String): Result<String?> = runCatching {
         val catalog = indexManager.getNoteCatalog()
-        com.nool.app.data.index.LinkResolver.resolveLink(rawTarget, sourceNotePath, catalog)
+        LinkResolver.resolveLink(rawTarget, sourceNotePath, catalog)
     }
 
     override suspend fun getGraphData(

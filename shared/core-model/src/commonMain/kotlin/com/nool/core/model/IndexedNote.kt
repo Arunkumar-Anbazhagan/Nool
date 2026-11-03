@@ -57,7 +57,7 @@ enum class NoteSearchScope {
 data class NoteTitleAndPath(
     val title: String,
     val relativePath: String,
-    val aliases: String
+    val aliases: String = ""
 )
 
 typealias BacklinkItem = BacklinkInfo

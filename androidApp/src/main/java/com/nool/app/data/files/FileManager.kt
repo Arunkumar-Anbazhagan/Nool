@@ -95,7 +95,7 @@ Enjoy writing!
             } else if (entry.isFile && entry.name.endsWith(".md", ignoreCase = true)) {
                 val title = entry.nameWithoutExtension
                 val content = try { entry.readText() } catch (e: Exception) { "" }
-                val parsed = com.nool.app.data.index.FrontmatterAndTagParser.parse(content)
+                val parsed = com.nool.core.markdown.FrontmatterAndTagParser.parse(content)
                 val excerpt = readFirstLines(entry, maxChars = 140)
                 items.add(
                     VaultItem.NoteItem(
