@@ -17,7 +17,7 @@ kotlin {
         libs.findLibrary("sqldelight-coroutines-extensions").ifPresent { implementation(it) }
     }
     sourceSets.getByName("androidMain").dependencies {
-        libs.findLibrary("sqldelight-android-driver").ifPresent { implementation(it) }
+        libs.findLibrary("sqldelight-android-driver").ifPresent { api(it) }
     }
     sourceSets.getByName("jvmMain").dependencies {
         libs.findLibrary("sqldelight-sqlite-driver").ifPresent { implementation(it) }

@@ -6,6 +6,11 @@ import com.nool.app.data.git.GitCloneNotificationHelper
 import com.nool.app.data.git.GitCredentialsStore
 import com.nool.app.data.git.GitRepository
 import com.nool.app.data.git.GitRepositoryImpl
+import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import com.nool.core.index.db.NoolDatabase as SqlDelightNoolDatabase
+import com.nool.core.index.SqlDelightIndexManager
+import com.nool.core.index.VaultWatcher
+import com.nool.app.data.index.AndroidFileObserverVaultWatcher
 import com.nool.app.data.index.IndexDao
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoolDatabase
@@ -30,7 +35,13 @@ val appModule = module {
     single { FileManager(androidContext()) }
     single { NoolDatabase.create(androidContext()) }
     single<IndexDao> { get<NoolDatabase>().indexDao() }
-    single { IndexManager(get<FileManager>().vaultRoot, get()) }
+    single {
+        val driver = AndroidSqliteDriver(SqlDelightNoolDatabase.Schema, androidContext(), "nool_index_v3.db")
+        SqlDelightNoolDatabase(driver)
+    }
+    single { SqlDelightIndexManager(get()) }
+    single<VaultWatcher> { AndroidFileObserverVaultWatcher() }
+    single { IndexManager(get<FileManager>().vaultRoot, get<IndexDao>(), get<SqlDelightIndexManager>()) }
     single { SettingsRepository(androidContext()) }
     single<VaultRepository> { VaultRepositoryImpl(get(), get()) }
     single { ShareManager(androidContext(), get()) }

@@ -112,6 +112,13 @@ class MainActivity : FragmentActivity() {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         fileManager.ensureVaultInitialized()
+                        indexManager.sqlDelightManager?.let { sqlDelight ->
+                            com.nool.app.data.index.IndexMigrationHelper.performMigrationIfNeeded(
+                                context = this@MainActivity,
+                                vaultRoot = fileManager.vaultRoot,
+                                sqlDelightManager = sqlDelight
+                            )
+                        }
                         indexManager.syncIndex()
                         syncEngine.startFileObserver()
                         if (credentialsStore.getRemoteUrl().isNotBlank()) {
