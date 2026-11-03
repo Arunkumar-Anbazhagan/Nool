@@ -22,29 +22,15 @@ data class CalloutInfo(
 )
 
 object CalloutHelper {
-    private val CALLOUT_REGEX = Regex("""^\[!([a-zA-Z0-9_-]+)\]([+-]?)(.*)$""")
-
     fun parseCalloutHeader(firstLine: String): CalloutInfo? {
-        val trimmed = firstLine.trim()
-        val match = CALLOUT_REGEX.find(trimmed) ?: return null
-
-        val type = match.groupValues[1].lowercase()
-        val collapseSymbol = match.groupValues[2]
-        val rawTitle = match.groupValues[3].trim()
-
-        val isCollapsible = collapseSymbol.isNotEmpty()
-        val isInitiallyCollapsed = collapseSymbol == "-"
-
-        val defaultTitle = type.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-        val title = if (rawTitle.isNotEmpty()) rawTitle else defaultTitle
-
-        val (color, icon) = getCalloutStyle(type)
+        val parsed = com.nool.core.markdown.CalloutParser.parseCalloutHeader(firstLine) ?: return null
+        val (color, icon) = getCalloutStyle(parsed.type)
 
         return CalloutInfo(
-            type = type,
-            title = title,
-            isCollapsible = isCollapsible,
-            isInitiallyCollapsed = isInitiallyCollapsed,
+            type = parsed.type,
+            title = parsed.title,
+            isCollapsible = parsed.isCollapsible,
+            isInitiallyCollapsed = parsed.isInitiallyCollapsed,
             color = color,
             icon = icon
         )
