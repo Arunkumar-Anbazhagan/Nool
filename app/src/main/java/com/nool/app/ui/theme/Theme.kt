@@ -2,8 +2,10 @@ package com.nool.app.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -13,6 +15,15 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+
+val NoolShapes = Shapes(
+    extraSmall = RoundedCornerShape(Dimens.CornerXSmall),
+    small = RoundedCornerShape(Dimens.CornerSmall),
+    medium = RoundedCornerShape(Dimens.CornerMedium),
+    large = RoundedCornerShape(Dimens.CornerLarge),
+    extraLarge = RoundedCornerShape(28.dp)
+)
 
 /**
  * Expressive Material 3 Tonal Palette Tiers for container hierarchy.
@@ -128,6 +139,7 @@ fun NoolTheme(
     MaterialTheme(
         colorScheme = finalColorScheme,
         typography = Typography,
+        shapes = NoolShapes,
         content = content
     )
 }
