@@ -4,7 +4,7 @@ import com.nool.core.markdown.FrontmatterAndTagParser
 import com.nool.core.index.LinkResolver
 import com.nool.app.data.index.IndexManager
 import com.nool.app.data.index.NoteEntity
-import com.nool.app.data.index.SearchScope
+import com.nool.core.model.SearchScope
 import com.nool.core.model.TrashedItem
 import com.nool.core.model.VaultItem
 import com.nool.app.domain.repository.VaultRepository
