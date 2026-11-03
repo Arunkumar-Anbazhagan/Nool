@@ -38,11 +38,13 @@ import com.nool.app.ui.editor.embed.NoteEmbedHelper
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.nool.app.ui.theme.Dimens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -871,6 +873,17 @@ private fun RenderListItem(
     }
 }
 
+private data class TableCellModel(
+    val content: AnnotatedString,
+    val alignment: TableCell.Alignment?,
+    val isHeader: Boolean
+)
+
+private data class TableRowModel(
+    val isHeader: Boolean,
+    val cells: List<TableCellModel>
+)
+
 @Composable
 private fun RenderTable(
     tableBlock: TableBlock,
@@ -879,78 +892,147 @@ private fun RenderTable(
 ) {
     val context = LocalContext.current
 
+    val rows = remember(tableBlock) {
+        val extractedRows = mutableListOf<TableRowModel>()
+        var section: Node? = tableBlock.firstChild
+        while (section != null) {
+            val isHead = section is TableHead
+            var rowNode: Node? = section.firstChild
+            while (rowNode != null) {
+                if (rowNode is TableRow) {
+                    val cells = mutableListOf<TableCellModel>()
+                    var cellNode: Node? = rowNode.firstChild
+                    while (cellNode != null) {
+                        if (cellNode is TableCell) {
+                            val text = buildInlineAnnotatedString(cellNode, onLinkClick != null || onWikiLinkClick != null)
+                            cells.add(
+                                TableCellModel(
+                                    content = text,
+                                    alignment = cellNode.alignment,
+                                    isHeader = isHead || cellNode.isHeader
+                                )
+                            )
+                        }
+                        cellNode = cellNode.next
+                    }
+                    if (cells.isNotEmpty()) {
+                        extractedRows.add(TableRowModel(isHeader = isHead, cells = cells))
+                    }
+                }
+                rowNode = rowNode.next
+            }
+            section = section.next
+        }
+        extractedRows
+    }
+
+    if (rows.isEmpty()) return
+
+    val numColumns = remember(rows) { rows.maxOf { it.cells.size } }
+    if (numColumns == 0) return
+
+    val columnWidths = remember(rows, numColumns) {
+        (0 until numColumns).map { col ->
+            var maxChars = 6
+            for (r in rows) {
+                if (col < r.cells.size) {
+                    maxChars = maxOf(maxChars, r.cells[col].content.text.length)
+                }
+            }
+            val estimated = (maxChars * 8.5f + 32).dp
+            estimated.coerceIn(110.dp, 340.dp)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(Dimens.CornerSmall))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.CornerSmall))
             .horizontalScroll(rememberScrollState())
     ) {
         Column {
-            var section: Node? = tableBlock.firstChild
-            while (section != null) {
-                when (section) {
-                    is TableHead -> {
-                        var row: Node? = section.firstChild
-                        while (row != null) {
-                            if (row is TableRow) {
-                                Row(
-                                    modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                        .padding(8.dp)
-                                ) {
-                                    var cell: Node? = row.firstChild
-                                    while (cell != null) {
-                                        if (cell is TableCell) {
-                                            val text = buildInlineAnnotatedString(cell, onLinkClick != null || onWikiLinkClick != null)
-                                            ClickableText(
-                                                text = text,
-                                                style = MaterialTheme.typography.titleSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                ),
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                onClick = { offset -> handleLinkClick(offset, text, context, onLinkClick, onWikiLinkClick) }
-                                            )
-                                        }
-                                        cell = cell.next
-                                    }
-                                }
-                            }
-                            row = row.next
+            var bodyRowIndex = 0
+            rows.forEachIndexed { index, row ->
+                val isHeaderRow = row.isHeader
+                val rowBg = when {
+                    isHeaderRow -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    bodyRowIndex % 2 == 1 -> MaterialTheme.colorScheme.surfaceContainerLow
+                    else -> MaterialTheme.colorScheme.surface
+                }
+                if (!isHeaderRow) {
+                    bodyRowIndex++
+                }
+
+                Row(
+                    modifier = Modifier
+                        .background(rowBg)
+                        .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (colIndex in 0 until numColumns) {
+                        if (colIndex > 0) {
+                            VerticalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                    alpha = if (isHeaderRow) 0.8f else 0.4f
+                                ),
+                                thickness = 1.dp
+                            )
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                    is TableBody -> {
-                        var row: Node? = section.firstChild
-                        while (row != null) {
-                            if (row is TableRow) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp)
-                                ) {
-                                    var cell: Node? = row.firstChild
-                                    while (cell != null) {
-                                        if (cell is TableCell) {
-                                            val text = buildInlineAnnotatedString(cell, onLinkClick != null || onWikiLinkClick != null)
-                                            ClickableText(
-                                                text = text,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    color = MaterialTheme.colorScheme.onBackground
-                                                ),
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                onClick = { offset -> handleLinkClick(offset, text, context, onLinkClick, onWikiLinkClick) }
-                                            )
-                                        }
-                                        cell = cell.next
-                                    }
+
+                        val cell = row.cells.getOrNull(colIndex)
+                        val alignment = cell?.alignment
+                        val cellAlignment = when (alignment) {
+                            TableCell.Alignment.CENTER -> Alignment.Center
+                            TableCell.Alignment.RIGHT -> Alignment.CenterEnd
+                            else -> Alignment.CenterStart
+                        }
+                        val textAlign = when (alignment) {
+                            TableCell.Alignment.CENTER -> androidx.compose.ui.text.style.TextAlign.Center
+                            TableCell.Alignment.RIGHT -> androidx.compose.ui.text.style.TextAlign.Right
+                            else -> androidx.compose.ui.text.style.TextAlign.Left
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .width(columnWidths[colIndex])
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            contentAlignment = cellAlignment
+                        ) {
+                            if (cell != null) {
+                                val textStyle = if (isHeaderRow) {
+                                    MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = textAlign
+                                    )
+                                } else {
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = textAlign
+                                    )
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                ClickableText(
+                                    text = cell.content,
+                                    style = textStyle,
+                                    onClick = { offset ->
+                                        handleLinkClick(offset, cell.content, context, onLinkClick, onWikiLinkClick)
+                                    }
+                                )
                             }
-                            row = row.next
                         }
                     }
                 }
-                section = section.next
+
+                if (index < rows.lastIndex) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                            alpha = if (isHeaderRow) 1f else 0.5f
+                        ),
+                        thickness = if (isHeaderRow) 1.5.dp else 1.dp
+                    )
+                }
             }
         }
     }
