@@ -159,7 +159,14 @@ private fun RenderBlockNode(
             RenderBlockQuote(node, vaultRoot, markdown, recursionDepth, visitedPaths, onToggleTask, onLinkClick, onWikiLinkClick)
         }
         is FencedCodeBlock -> {
-            RenderCodeBlock(node.literal, node.info)
+            if (node.info?.trim()?.equals("mermaid", ignoreCase = true) == true) {
+                com.nool.app.ui.editor.mermaid.MermaidDiagramCard(
+                    code = node.literal,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                RenderCodeBlock(node.literal, node.info)
+            }
         }
         is IndentedCodeBlock -> {
             RenderCodeBlock(node.literal, null)
