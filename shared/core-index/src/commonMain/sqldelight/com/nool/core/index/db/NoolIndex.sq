@@ -139,3 +139,55 @@ getReferencingSourcePaths:
 SELECT DISTINCT sourcePath FROM links
 WHERE LOWER(targetTitle) = LOWER(:targetTitle)
    OR resolvedPath = :resolvedPath;
+
+CREATE TABLE calendar_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    calendarId TEXT NOT NULL DEFAULT 'Personal',
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    startTime INTEGER NOT NULL,
+    endTime INTEGER NOT NULL,
+    isAllDay INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    colorHex TEXT NOT NULL DEFAULT '#6750A4',
+    rrule TEXT,
+    reminderMinutes INTEGER NOT NULL DEFAULT 15,
+    linkedNotePath TEXT,
+    createdTimestamp INTEGER NOT NULL DEFAULT 0,
+    lastModified INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_events_start_end ON calendar_events(startTime, endTime);
+CREATE INDEX idx_events_calendar ON calendar_events(calendarId);
+CREATE INDEX idx_events_note ON calendar_events(linkedNotePath);
+
+upsertCalendarEvent:
+INSERT OR REPLACE INTO calendar_events(
+    id, calendarId, title, description, startTime, endTime,
+    isAllDay, colorHex, rrule, reminderMinutes, linkedNotePath,
+    createdTimestamp, lastModified
+) VALUES (
+    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?,
+    ?, ?
+);
+
+deleteCalendarEvent:
+DELETE FROM calendar_events WHERE id = ?;
+
+getCalendarEvent:
+SELECT * FROM calendar_events WHERE id = ? LIMIT 1;
+
+getAllCalendarEvents:
+SELECT * FROM calendar_events ORDER BY startTime ASC;
+
+getEventsInRange:
+SELECT * FROM calendar_events
+WHERE (endTime >= :rangeStart AND startTime <= :rangeEnd) OR rrule IS NOT NULL
+ORDER BY startTime ASC;
+
+getEventsForNote:
+SELECT * FROM calendar_events WHERE linkedNotePath = ?;
+
+clearAllCalendarEvents:
+DELETE FROM calendar_events;
+

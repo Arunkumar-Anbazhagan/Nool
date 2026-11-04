@@ -100,4 +100,43 @@ class SqlDelightIndexManagerTest {
         val resolvedAlias = LinkResolver.resolveLink("AliasBeta", "Root.md", catalog)
         assertEquals("Beta.md", resolvedAlias)
     }
+
+    @Test
+    fun testCalendarEventsUpsertAndRangeQuery() = runTest {
+        val manager = createIndexManager()
+
+        val event1 = com.nool.core.model.CalendarEvent(
+            id = "ev-1",
+            title = "Doctor Appointment",
+            startTime = 10_000L,
+            endTime = 12_000L,
+            calendarId = "Personal"
+        )
+        val event2 = com.nool.core.model.CalendarEvent(
+            id = "ev-2",
+            title = "Daily Sync",
+            startTime = 10_000L,
+            endTime = 11_000L,
+            rrule = "FREQ=DAILY;COUNT=3",
+            calendarId = "Work"
+        )
+
+        manager.upsertCalendarEvent(event1)
+        manager.upsertCalendarEvent(event2)
+
+        val retrieved = manager.getCalendarEvent("ev-1")
+        assertNotNull(retrieved)
+        assertEquals("Doctor Appointment", retrieved.title)
+        assertEquals("Personal", retrieved.calendarId)
+
+        // Query in range (includes event1 and 3 occurrences of event2)
+        val instances = manager.getCalendarEventsInRange(0L, 300_000_000L)
+        // 1 (event1) + 3 (event2 occurrences) = 4
+        assertEquals(4, instances.size)
+
+        // Delete ev-1
+        manager.deleteCalendarEvent("ev-1")
+        val deleted = manager.getCalendarEvent("ev-1")
+        kotlin.test.assertNull(deleted)
+    }
 }

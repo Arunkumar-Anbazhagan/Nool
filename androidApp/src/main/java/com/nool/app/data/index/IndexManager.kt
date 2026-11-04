@@ -232,4 +232,28 @@ class IndexManager(
     ): com.nool.core.model.GraphData = withContext(Dispatchers.IO) {
         sqlDelightManager.getGraphData(localNotePath, localDepth)
     }
+
+    suspend fun upsertCalendarEvent(event: CalendarEvent): Unit = withContext(Dispatchers.IO) {
+        sqlDelightManager.upsertCalendarEvent(event)
+    }
+
+    suspend fun deleteCalendarEvent(id: String): Unit = withContext(Dispatchers.IO) {
+        sqlDelightManager.deleteCalendarEvent(id)
+    }
+
+    suspend fun getCalendarEvent(id: String): CalendarEvent? = withContext(Dispatchers.IO) {
+        sqlDelightManager.getCalendarEvent(id)
+    }
+
+    suspend fun getAllCalendarEvents(): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        sqlDelightManager.getAllCalendarEvents()
+    }
+
+    suspend fun getCalendarEventsInRange(rangeStart: Long, rangeEnd: Long): List<CalendarEventInstance> = withContext(Dispatchers.IO) {
+        sqlDelightManager.getCalendarEventsInRange(rangeStart, rangeEnd)
+    }
+
+    suspend fun getEventsForNote(notePath: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        sqlDelightManager.getEventsForNote(notePath)
+    }
 }

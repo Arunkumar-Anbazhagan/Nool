@@ -35,6 +35,8 @@ sealed class Screen(val route: String) {
 
     data object Settings : Screen("settings")
 
+    data object Calendar : Screen("calendar")
+
     data object Graph : Screen("graph?notePath={notePath}") {
         fun createRoute(notePath: String = ""): String {
             val encoded = URLEncoder.encode(notePath, StandardCharsets.UTF_8.toString())

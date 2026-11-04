@@ -312,6 +312,63 @@ class SqlDelightIndexManager(
         )
     }
 
+    suspend fun upsertCalendarEvent(event: CalendarEvent): Unit = withContext(ioDispatcher) {
+        database.noolIndexQueries.upsertCalendarEvent(
+            id = event.id,
+            calendarId = event.calendarId,
+            title = event.title,
+            description = event.description,
+            startTime = event.startTime,
+            endTime = event.endTime,
+            isAllDay = event.isAllDay,
+            colorHex = event.colorHex,
+            rrule = event.rrule,
+            reminderMinutes = event.reminderMinutes.toLong(),
+            linkedNotePath = event.linkedNotePath,
+            createdTimestamp = event.createdTimestamp,
+            lastModified = event.lastModified
+        )
+    }
+
+    suspend fun deleteCalendarEvent(id: String): Unit = withContext(ioDispatcher) {
+        database.noolIndexQueries.deleteCalendarEvent(id)
+    }
+
+    suspend fun getCalendarEvent(id: String): CalendarEvent? = withContext(ioDispatcher) {
+        database.noolIndexQueries.getCalendarEvent(id).executeAsOneOrNull()?.toCalendarEvent()
+    }
+
+    suspend fun getAllCalendarEvents(): List<CalendarEvent> = withContext(ioDispatcher) {
+        database.noolIndexQueries.getAllCalendarEvents().executeAsList().map { it.toCalendarEvent() }
+    }
+
+    suspend fun getCalendarEventsInRange(rangeStart: Long, rangeEnd: Long): List<CalendarEventInstance> = withContext(ioDispatcher) {
+        val rawEvents = database.noolIndexQueries.getEventsInRange(rangeStart = rangeStart, rangeEnd = rangeEnd).executeAsList().map { it.toCalendarEvent() }
+        rawEvents.flatMap { event ->
+            RruleExpander.expand(event, rangeStart, rangeEnd)
+        }.sortedBy { it.instanceStartTime }
+    }
+
+    suspend fun getEventsForNote(notePath: String): List<CalendarEvent> = withContext(ioDispatcher) {
+        database.noolIndexQueries.getEventsForNote(notePath).executeAsList().map { it.toCalendarEvent() }
+    }
+
+    private fun com.nool.core.index.db.Calendar_events.toCalendarEvent(): CalendarEvent = CalendarEvent(
+        id = id,
+        calendarId = calendarId,
+        title = title,
+        description = description,
+        startTime = startTime,
+        endTime = endTime,
+        isAllDay = isAllDay,
+        colorHex = colorHex,
+        rrule = rrule,
+        reminderMinutes = reminderMinutes.toInt(),
+        linkedNotePath = linkedNotePath,
+        createdTimestamp = createdTimestamp,
+        lastModified = lastModified
+    )
+
     private fun Notes.toIndexedNote(): IndexedNote = IndexedNote(
         id = id,
         relativePath = relativePath,

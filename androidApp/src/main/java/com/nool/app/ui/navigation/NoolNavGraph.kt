@@ -96,6 +96,20 @@ fun NoolNavGraph(
                 },
                 onNavigateToGitSetup = {
                     navController.navigate(Screen.GitSetup.route)
+                },
+                onNavigateToCalendar = {
+                    navController.navigate(Screen.Calendar.route)
+                }
+            )
+        }
+
+        composable(route = Screen.Calendar.route) {
+            val calendarViewModel: com.nool.app.ui.calendar.CalendarViewModel = koinViewModel()
+            com.nool.app.ui.calendar.CalendarScreen(
+                viewModel = calendarViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenNote = { notePath ->
+                    navController.navigate(Screen.NoteDetail.createRoute(notePath))
                 }
             )
         }

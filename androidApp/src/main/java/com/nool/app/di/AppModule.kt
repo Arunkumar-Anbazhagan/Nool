@@ -70,4 +70,5 @@ val appModule = module {
     viewModel { GitViewModel(get(), get(), get(), get(), get()) }
     viewModel { (initialNotePath: String?) -> com.nool.app.ui.graph.GraphViewModel(get(), initialNotePath) }
     viewModel { ShareViewModel(get(), get()) }
+    viewModel { com.nool.app.ui.calendar.CalendarViewModel(get(), get(), get(), androidContext()) }
 }
