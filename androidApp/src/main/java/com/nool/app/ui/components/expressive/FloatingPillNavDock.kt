@@ -68,8 +68,8 @@ fun FloatingPillNavDock(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = navInsets.calculateBottomPadding() + 12.dp),
+            .padding(horizontal = com.nool.app.ui.theme.Dimens.ScreenHorizontalMargin)
+            .padding(bottom = navInsets.calculateBottomPadding() + com.nool.app.ui.theme.Dimens.Spacing12),
         contentAlignment = Alignment.Center
     ) {
         Row(

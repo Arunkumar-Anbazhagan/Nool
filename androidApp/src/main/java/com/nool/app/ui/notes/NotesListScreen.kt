@@ -2,6 +2,7 @@ package com.nool.app.ui.notes
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,11 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
@@ -26,19 +31,20 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,12 +73,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.nool.core.model.VaultItem
+import com.nool.app.settings.NoteLayoutMode
 import com.nool.app.ui.components.expressive.FloatingPillNavDock
 import com.nool.app.ui.components.expressive.NavDockItem
 import com.nool.app.ui.components.expressive.ScallopedFlowerButton
+import com.nool.app.ui.git.GitStatusChip
+import com.nool.app.ui.git.GitSyncLogSheet
+import com.nool.app.ui.git.GitViewModel
 import com.nool.app.ui.navigation.quickswitcher.QuickSwitcherDialog
-import com.nool.app.ui.sidebar.LeftSidebarDrawer
 import com.nool.app.ui.notes.components.BreadcrumbsBar
 import com.nool.app.ui.notes.components.CreateFolderDialog
 import com.nool.app.ui.notes.components.CreateNoteDialog
@@ -80,10 +88,10 @@ import com.nool.app.ui.notes.components.DeleteConfirmationDialog
 import com.nool.app.ui.notes.components.MoveDialog
 import com.nool.app.ui.notes.components.RenameDialog
 import com.nool.app.ui.notes.components.SortFilterDialog
-import com.nool.app.ui.notes.components.VaultItemRow
-import com.nool.app.ui.git.GitStatusChip
-import com.nool.app.ui.git.GitSyncLogSheet
-import com.nool.app.ui.git.GitViewModel
+import com.nool.app.ui.notes.components.VaultItemCard
+import com.nool.app.ui.sidebar.LeftSidebarDrawer
+import com.nool.app.ui.theme.Dimens
+import com.nool.core.model.VaultItem
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -102,6 +110,7 @@ fun NotesListScreen(
     onNavigateToGitStatus: () -> Unit = {},
     onNavigateToGitConflict: () -> Unit = {},
     onNavigateToGitSetup: () -> Unit = {},
+    onNavigateToCalendar: () -> Unit = {},
     gitViewModel: GitViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -115,6 +124,7 @@ fun NotesListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showCreateBottomSheet by remember { mutableStateOf(false) }
     var showQuickSwitcher by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -199,7 +209,8 @@ fun NotesListScreen(
                             val titleText = if (uiState.currentFolder.isEmpty()) "Nool" else uiState.currentFolder.substringAfterLast("/")
                             Text(
                                 text = titleText,
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
                             )
                             val noteCount = uiState.items.count { !it.isDirectory }
                             val folderCount = uiState.items.count { it.isDirectory }
@@ -216,18 +227,24 @@ fun NotesListScreen(
                     },
                     navigationIcon = {
                         if (uiState.currentFolder.isNotEmpty()) {
-                            IconButton(onClick = onNavigateUp) {
+                            IconButton(
+                                onClick = onNavigateUp,
+                                modifier = Modifier.size(Dimens.MinTouchTarget)
+                            ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Up to parent folder"
                                 )
                             }
                         } else {
-                            IconButton(onClick = {
-                                scope.launch {
-                                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
-                                }
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                    }
+                                },
+                                modifier = Modifier.size(Dimens.MinTouchTarget)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Menu,
                                     contentDescription = "Sidebar"
@@ -241,63 +258,118 @@ fun NotesListScreen(
                                 status = gitSyncStatus,
                                 onClick = { gitViewModel.toggleSyncLogSheet() }
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(Dimens.Spacing4))
                         }
-                        IconButton(onClick = { showQuickSwitcher = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = "Quick Switcher",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        IconButton(onClick = { viewModel.openOrCreateDailyNote() }) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarToday,
-                                contentDescription = "Daily Note"
-                            )
-                        }
-                        IconButton(onClick = onNavigateToGraph) {
-                            Icon(
-                                imageVector = Icons.Default.Hub,
-                                contentDescription = "Graph View",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        IconButton(onClick = { onNavigateToSearch("") }) {
+                        IconButton(
+                            onClick = { onNavigateToSearch("") },
+                            modifier = Modifier.size(Dimens.MinTouchTarget)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search"
                             )
                         }
-                        IconButton(onClick = { viewModel.showTasks() }) {
+                        IconButton(
+                            onClick = { viewModel.toggleLayoutMode() },
+                            modifier = Modifier.size(Dimens.MinTouchTarget)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Tasks & Due Dates"
+                                imageVector = if (uiState.layoutMode == NoteLayoutMode.GRID) {
+                                    Icons.AutoMirrored.Filled.ViewList
+                                } else {
+                                    Icons.Default.GridView
+                                },
+                                contentDescription = if (uiState.layoutMode == NoteLayoutMode.GRID) "Switch to list view" else "Switch to grid view"
                             )
                         }
-                        IconButton(onClick = { viewModel.showFlashcards() }) {
-                            Icon(
-                                imageVector = Icons.Default.Psychology,
-                                contentDescription = "Flashcard Review"
-                            )
-                        }
-                        IconButton(onClick = { viewModel.showSortFilterDialog() }) {
+                        IconButton(
+                            onClick = { viewModel.showSortFilterDialog() },
+                            modifier = Modifier.size(Dimens.MinTouchTarget)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.FilterList,
                                 contentDescription = "Sort and filter"
                             )
                         }
-                        IconButton(onClick = onNavigateToTrash) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Trash"
-                            )
-                        }
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings"
-                            )
+                        Box {
+                            IconButton(
+                                onClick = { showOverflowMenu = true },
+                                modifier = Modifier.size(Dimens.MinTouchTarget)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More actions"
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showOverflowMenu,
+                                onDismissRequest = { showOverflowMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Quick Switcher") },
+                                    leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        showQuickSwitcher = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Daily Note") },
+                                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        viewModel.openOrCreateDailyNote()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Calendar View") },
+                                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToCalendar()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Graph View") },
+                                    leadingIcon = { Icon(Icons.Default.Hub, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToGraph()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Tasks & Due Dates") },
+                                    leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        viewModel.showTasks()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Flashcards") },
+                                    leadingIcon = { Icon(Icons.Default.Psychology, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        viewModel.showFlashcards()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Trash") },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToTrash()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Settings") },
+                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToSettings()
+                                    }
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -309,6 +381,7 @@ fun NotesListScreen(
                 FloatingPillNavDock(
                     items = listOf(
                         NavDockItem("notes", "Notes", Icons.Default.Description),
+                        NavDockItem("calendar", "Calendar", Icons.Default.CalendarToday),
                         NavDockItem("switcher", "Switch", Icons.Default.Bolt),
                         NavDockItem("search", "Search", Icons.Default.Search),
                         NavDockItem("graph", "Graph", Icons.Default.Hub),
@@ -317,6 +390,7 @@ fun NotesListScreen(
                     selectedItemId = "notes",
                     onItemSelected = { item ->
                         when (item.id) {
+                            "calendar" -> onNavigateToCalendar()
                             "switcher" -> showQuickSwitcher = true
                             "search" -> onNavigateToSearch("")
                             "graph" -> onNavigateToGraph()
@@ -339,69 +413,120 @@ fun NotesListScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = MaterialTheme.colorScheme.background
         ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Breadcrumbs Navigation
-            BreadcrumbsBar(
-                breadcrumbs = uiState.breadcrumbs,
-                onCrumbClick = { crumb ->
-                    if (crumb.relativePath != uiState.currentFolder) {
-                        onNavigateToFolder(crumb.relativePath)
-                    }
-                }
-            )
-
-            // Content Area
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f)
+                    .padding(innerPadding)
             ) {
-                if (uiState.isLoading && uiState.items.isEmpty()) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                } else if (uiState.items.isEmpty()) {
-                    EmptyVaultFolderState(
-                        folderName = if (uiState.currentFolder.isEmpty()) "Vault" else uiState.currentFolder.substringAfterLast("/"),
-                        onCreateNote = { viewModel.showCreateNoteDialog() },
-                        onCreateFolder = { viewModel.showCreateFolderDialog() }
-                    )
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(
-                            items = uiState.items,
-                            key = { it.relativePath }
-                        ) { item ->
-                            VaultItemRow(
-                                item = item,
-                                onClick = {
-                                    if (item.isDirectory) {
-                                        onNavigateToFolder(item.relativePath)
-                                    } else {
-                                        onNavigateToNote(item.relativePath)
-                                    }
-                                },
-                                onRename = { viewModel.showRenameDialog(item) },
-                                onMove = { viewModel.showMoveDialog(item) },
-                                onDelete = { viewModel.showDeleteDialog(item) },
-                                onTogglePin = if (item is VaultItem.NoteItem) { { viewModel.togglePin(item) } } else null,
-                                onToggleFavorite = if (item is VaultItem.NoteItem) { { viewModel.toggleFavorite(item) } } else null,
-                                onToggleArchive = if (item is VaultItem.NoteItem) { { viewModel.toggleArchive(item) } } else null
-                            )
+                // Breadcrumbs Navigation
+                BreadcrumbsBar(
+                    breadcrumbs = uiState.breadcrumbs,
+                    onCrumbClick = { crumb ->
+                        if (crumb.relativePath != uiState.currentFolder) {
+                            onNavigateToFolder(crumb.relativePath)
+                        }
+                    }
+                )
+
+                // Responsive Content Area
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                ) {
+                    val isGrid = uiState.layoutMode == NoteLayoutMode.GRID
+                    val columnCount = when {
+                        !isGrid -> 1
+                        maxWidth >= 840.dp -> 4
+                        maxWidth >= 600.dp -> 3
+                        else -> 2
+                    }
+
+                    if (uiState.isLoading && uiState.items.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (uiState.items.isEmpty()) {
+                        EmptyVaultFolderState(
+                            folderName = if (uiState.currentFolder.isEmpty()) "Vault" else uiState.currentFolder.substringAfterLast("/"),
+                            onCreateNote = { viewModel.showCreateNoteDialog() },
+                            onCreateFolder = { viewModel.showCreateFolderDialog() }
+                        )
+                    } else if (columnCount == 1) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(
+                                start = Dimens.ScreenHorizontalMargin,
+                                end = Dimens.ScreenHorizontalMargin,
+                                top = Dimens.Spacing8,
+                                bottom = 96.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.CardItemSpacing),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(
+                                items = uiState.items,
+                                key = { it.relativePath }
+                            ) { item ->
+                                VaultItemCard(
+                                    item = item,
+                                    isGrid = false,
+                                    onClick = {
+                                        if (item.isDirectory) {
+                                            onNavigateToFolder(item.relativePath)
+                                        } else {
+                                            onNavigateToNote(item.relativePath)
+                                        }
+                                    },
+                                    onRename = { viewModel.showRenameDialog(item) },
+                                    onMove = { viewModel.showMoveDialog(item) },
+                                    onDelete = { viewModel.showDeleteDialog(item) },
+                                    onTogglePin = if (item is VaultItem.NoteItem) { { viewModel.togglePin(item) } } else null,
+                                    onToggleFavorite = if (item is VaultItem.NoteItem) { { viewModel.toggleFavorite(item) } } else null,
+                                    onToggleArchive = if (item is VaultItem.NoteItem) { { viewModel.toggleArchive(item) } } else null
+                                )
+                            }
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(columnCount),
+                            contentPadding = PaddingValues(
+                                start = Dimens.ScreenHorizontalMargin,
+                                end = Dimens.ScreenHorizontalMargin,
+                                top = Dimens.Spacing8,
+                                bottom = 96.dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.CardItemSpacing),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.CardItemSpacing),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(
+                                items = uiState.items,
+                                key = { it.relativePath }
+                            ) { item ->
+                                VaultItemCard(
+                                    item = item,
+                                    isGrid = true,
+                                    onClick = {
+                                        if (item.isDirectory) {
+                                            onNavigateToFolder(item.relativePath)
+                                        } else {
+                                            onNavigateToNote(item.relativePath)
+                                        }
+                                    },
+                                    onRename = { viewModel.showRenameDialog(item) },
+                                    onMove = { viewModel.showMoveDialog(item) },
+                                    onDelete = { viewModel.showDeleteDialog(item) },
+                                    onTogglePin = if (item is VaultItem.NoteItem) { { viewModel.togglePin(item) } } else null,
+                                    onToggleFavorite = if (item is VaultItem.NoteItem) { { viewModel.toggleFavorite(item) } } else null,
+                                    onToggleArchive = if (item is VaultItem.NoteItem) { { viewModel.toggleArchive(item) } } else null
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
 
     // Create Bottom Sheet
     if (showCreateBottomSheet) {
@@ -412,40 +537,40 @@ fun NotesListScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .padding(horizontal = Dimens.Spacing24, vertical = Dimens.Spacing16)
             ) {
                 Text(
                     text = "Create in this directory",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(Dimens.Spacing16))
                 ElevatedButton(
                     onClick = {
                         showCreateBottomSheet = false
                         viewModel.showCreateNoteDialog()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(Dimens.Spacing8))
                     Text("New Markdown Note (.md)")
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Dimens.Spacing12))
                 OutlinedButton(
                     onClick = {
                         showCreateBottomSheet = false
                         viewModel.showCreateFolderDialog()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(Icons.Default.CreateNewFolder, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(Dimens.Spacing8))
                     Text("New Folder")
                 }
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(Dimens.Spacing24))
             }
         }
     }
@@ -558,12 +683,12 @@ fun EmptyVaultFolderState(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(Dimens.Spacing32),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(72.dp)
         ) {
@@ -576,35 +701,37 @@ fun EmptyVaultFolderState(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Dimens.Spacing16))
         Text(
             text = "No notes in $folderName",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Dimens.Spacing8))
         Text(
             text = "Create markdown notes and organize them with nested folders. Everything is stored as plain files.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Spacer(modifier = Modifier.height(Dimens.Spacing24))
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing12)) {
             ElevatedButton(
                 onClick = onCreateNote,
-                shape = RoundedCornerShape(10.dp)
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.size(width = 140.dp, height = Dimens.MinTouchTarget)
             ) {
-                Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null, modifier = Modifier.size(Dimens.IconSmall))
+                Spacer(modifier = Modifier.width(Dimens.Spacing8))
                 Text("New Note")
             }
             OutlinedButton(
                 onClick = onCreateFolder,
-                shape = RoundedCornerShape(10.dp)
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.size(width = 140.dp, height = Dimens.MinTouchTarget)
             ) {
-                Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(Dimens.IconSmall))
+                Spacer(modifier = Modifier.width(Dimens.Spacing8))
                 Text("New Folder")
             }
         }

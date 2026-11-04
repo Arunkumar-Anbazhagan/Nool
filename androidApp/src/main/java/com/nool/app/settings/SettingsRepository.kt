@@ -19,6 +19,18 @@ enum class ThemeMode {
     DARK
 }
 
+enum class NoteLayoutMode(val label: String) {
+    LIST("List"),
+    GRID("Grid")
+}
+
+enum class CalendarDefaultView(val label: String) {
+    MONTH("Month"),
+    WEEK("Week"),
+    DAY("Day"),
+    AGENDA("Agenda")
+}
+
 enum class SortOption(val label: String) {
     MODIFIED_DESC("Last modified (newest)"),
     MODIFIED_ASC("Last modified (oldest)"),
@@ -44,13 +56,19 @@ class SettingsRepository(
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         private val KEY_FONT_SIZE = intPreferencesKey("font_size")
+        private val KEY_NOTE_LAYOUT_MODE = stringPreferencesKey("note_layout_mode")
         private val KEY_SORT_OPTION = stringPreferencesKey("sort_option")
         private val KEY_SHOW_ARCHIVED = booleanPreferencesKey("show_archived")
         private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black")
         private val KEY_TEMPLATES_FOLDER = stringPreferencesKey("templates_folder")
         private val KEY_DAILY_NOTES_FOLDER = stringPreferencesKey("daily_notes_folder")
+        private val KEY_AUTO_SAVE = booleanPreferencesKey("auto_save")
         private val KEY_SAVED_SEARCHES = stringPreferencesKey("saved_searches")
         private val KEY_BIOMETRIC_LOCK = booleanPreferencesKey("biometric_lock")
+        private val KEY_CALENDAR_DEFAULT_VIEW = stringPreferencesKey("calendar_default_view")
+        private val KEY_CALENDAR_FIRST_DAY = intPreferencesKey("calendar_first_day")
+        private val KEY_CALENDAR_DEFAULT_REMINDER = intPreferencesKey("calendar_default_reminder")
+        private val KEY_CALENDAR_DEFAULT_CALENDAR = stringPreferencesKey("calendar_default_calendar")
     }
 
     val themeMode: Flow<ThemeMode> = dataStore?.data?.map { prefs ->
@@ -65,6 +83,11 @@ class SettingsRepository(
     val fontSize: Flow<Int> = dataStore?.data?.map { prefs ->
         prefs[KEY_FONT_SIZE] ?: 16
     } ?: kotlinx.coroutines.flow.flowOf(16)
+
+    val noteLayoutMode: Flow<NoteLayoutMode> = dataStore?.data?.map { prefs ->
+        val raw = prefs[KEY_NOTE_LAYOUT_MODE] ?: NoteLayoutMode.LIST.name
+        try { NoteLayoutMode.valueOf(raw) } catch (e: Exception) { NoteLayoutMode.LIST }
+    } ?: kotlinx.coroutines.flow.flowOf(NoteLayoutMode.LIST)
 
     val sortOption: Flow<SortOption> = dataStore?.data?.map { prefs ->
         val raw = prefs[KEY_SORT_OPTION] ?: SortOption.MODIFIED_DESC.name
@@ -87,9 +110,30 @@ class SettingsRepository(
         prefs[KEY_DAILY_NOTES_FOLDER] ?: "Daily Notes"
     } ?: kotlinx.coroutines.flow.flowOf("Daily Notes")
 
+    val autoSave: Flow<Boolean> = dataStore?.data?.map { prefs ->
+        prefs[KEY_AUTO_SAVE] ?: true
+    } ?: kotlinx.coroutines.flow.flowOf(true)
+
     val biometricLock: Flow<Boolean> = dataStore?.data?.map { prefs ->
         prefs[KEY_BIOMETRIC_LOCK] ?: false
     } ?: kotlinx.coroutines.flow.flowOf(false)
+
+    val calendarDefaultView: Flow<CalendarDefaultView> = dataStore?.data?.map { prefs ->
+        val raw = prefs[KEY_CALENDAR_DEFAULT_VIEW] ?: CalendarDefaultView.MONTH.name
+        try { CalendarDefaultView.valueOf(raw) } catch (e: Exception) { CalendarDefaultView.MONTH }
+    } ?: kotlinx.coroutines.flow.flowOf(CalendarDefaultView.MONTH)
+
+    val calendarFirstDayOfWeek: Flow<Int> = dataStore?.data?.map { prefs ->
+        prefs[KEY_CALENDAR_FIRST_DAY] ?: java.util.Calendar.MONDAY
+    } ?: kotlinx.coroutines.flow.flowOf(java.util.Calendar.MONDAY)
+
+    val calendarDefaultReminderMinutes: Flow<Int> = dataStore?.data?.map { prefs ->
+        prefs[KEY_CALENDAR_DEFAULT_REMINDER] ?: 15
+    } ?: kotlinx.coroutines.flow.flowOf(15)
+
+    val calendarDefaultCalendar: Flow<String> = dataStore?.data?.map { prefs ->
+        prefs[KEY_CALENDAR_DEFAULT_CALENDAR] ?: "Personal"
+    } ?: kotlinx.coroutines.flow.flowOf("Personal")
 
     val savedSearches: Flow<List<SavedSearch>> = dataStore?.data?.map { prefs ->
         val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
@@ -165,6 +209,10 @@ class SettingsRepository(
         dataStore?.edit { it[KEY_FONT_SIZE] = size.coerceIn(12, 24) }
     }
 
+    suspend fun setNoteLayoutMode(mode: NoteLayoutMode) {
+        dataStore?.edit { it[KEY_NOTE_LAYOUT_MODE] = mode.name }
+    }
+
     suspend fun setSortOption(option: SortOption) {
         dataStore?.edit { it[KEY_SORT_OPTION] = option.name }
     }
@@ -185,7 +233,27 @@ class SettingsRepository(
         dataStore?.edit { it[KEY_DAILY_NOTES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") }
     }
 
+    suspend fun setAutoSave(enabled: Boolean) {
+        dataStore?.edit { it[KEY_AUTO_SAVE] = enabled }
+    }
+
     suspend fun setBiometricLock(enabled: Boolean) {
         dataStore?.edit { it[KEY_BIOMETRIC_LOCK] = enabled }
+    }
+
+    suspend fun setCalendarDefaultView(view: CalendarDefaultView) {
+        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_VIEW] = view.name }
+    }
+
+    suspend fun setCalendarFirstDayOfWeek(day: Int) {
+        dataStore?.edit { it[KEY_CALENDAR_FIRST_DAY] = day }
+    }
+
+    suspend fun setCalendarDefaultReminderMinutes(minutes: Int) {
+        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_REMINDER] = minutes }
+    }
+
+    suspend fun setCalendarDefaultCalendar(name: String) {
+        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_CALENDAR] = name.trim() }
     }
 }

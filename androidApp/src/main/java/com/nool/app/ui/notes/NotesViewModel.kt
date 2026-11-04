@@ -31,6 +31,7 @@ data class NotesUiState(
     val items: List<VaultItem> = emptyList(),
     val sortOption: SortOption = SortOption.MODIFIED_DESC,
     val showArchived: Boolean = false,
+    val layoutMode: com.nool.app.settings.NoteLayoutMode = com.nool.app.settings.NoteLayoutMode.LIST,
     val isLoading: Boolean = false,
     val activeDialog: NotesDialogState? = null,
     val notesOnThisDay: List<com.nool.app.data.index.NoteEntity> = emptyList(),
@@ -109,6 +110,22 @@ class NotesViewModel(
             settingsRepository.savedSearches.collect { searches ->
                 _savedSearches.value = searches
             }
+        }
+        viewModelScope.launch {
+            settingsRepository.noteLayoutMode.collect { mode ->
+                _uiState.update { it.copy(layoutMode = mode) }
+            }
+        }
+    }
+
+    fun toggleLayoutMode() {
+        val next = if (_uiState.value.layoutMode == com.nool.app.settings.NoteLayoutMode.LIST) {
+            com.nool.app.settings.NoteLayoutMode.GRID
+        } else {
+            com.nool.app.settings.NoteLayoutMode.LIST
+        }
+        viewModelScope.launch {
+            settingsRepository.setNoteLayoutMode(next)
         }
     }
 
