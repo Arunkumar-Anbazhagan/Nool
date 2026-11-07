@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nool.app.data.index.IndexManager
-import com.nool.app.data.index.NoteEntity
+import com.nool.core.model.IndexedNote
 import com.nool.app.domain.repository.VaultRepository
 import com.nool.app.settings.CalendarDefaultView
 import com.nool.app.settings.SettingsRepository
@@ -39,7 +39,7 @@ data class CalendarUiState(
     val isEditSheetOpen: Boolean = false,
     val isAgendaSheetOpen: Boolean = false,
     val selectedDayEvents: List<CalendarEventInstance> = emptyList(),
-    val allVaultNotes: List<NoteEntity> = emptyList(),
+    val allVaultNotes: List<IndexedNote> = emptyList(),
     val firstDayOfWeek: Int = Calendar.MONDAY
 )
 
@@ -104,6 +104,7 @@ class CalendarViewModel(
     }
 
     fun openCreateEvent(initialDate: Long = _uiState.value.selectedDate) {
+        loadNoteDates()
         _uiState.update {
             it.copy(
                 editingEvent = null,
@@ -114,6 +115,7 @@ class CalendarViewModel(
     }
 
     fun openEditEvent(event: CalendarEvent) {
+        loadNoteDates()
         _uiState.update {
             it.copy(
                 editingEvent = event,
@@ -153,12 +155,14 @@ class CalendarViewModel(
             try {
                 withContext(Dispatchers.IO) {
                     indexManager.upsertCalendarEvent(event)
-                    CalendarReminderScheduler.scheduleReminder(context, event)
+                    runCatching {
+                        CalendarReminderScheduler.scheduleReminder(context, event)
+                    }
                 }
-                loadEventsForCurrentRange()
-                updateSelectedDayEvents(_uiState.value.selectedDate)
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                loadEventsForCurrentRangeInternal()
             }
         }
     }
@@ -168,12 +172,14 @@ class CalendarViewModel(
             try {
                 withContext(Dispatchers.IO) {
                     indexManager.deleteCalendarEvent(eventId)
-                    CalendarReminderScheduler.cancelReminder(context, eventId)
+                    runCatching {
+                        CalendarReminderScheduler.cancelReminder(context, eventId)
+                    }
                 }
-                loadEventsForCurrentRange()
-                updateSelectedDayEvents(_uiState.value.selectedDate)
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                loadEventsForCurrentRangeInternal()
             }
         }
     }
@@ -181,7 +187,8 @@ class CalendarViewModel(
     fun createNoteForEvent(title: String, onCreated: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val noteTitle = "Event - ${title.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "_")}"
+                val cleanTitle = if (title.isBlank()) "Event Note" else title.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "_")
+                val noteTitle = "Event - $cleanTitle"
                 val initialContent = buildString {
                     appendLine("---")
                     appendLine("title: \"$title\"")
@@ -204,20 +211,24 @@ class CalendarViewModel(
         }
     }
 
-    private fun loadEventsForCurrentRange() {
-        viewModelScope.launch {
-            try {
-                val (startRange, endRange) = calculateRangeForMode(_uiState.value.selectedDate, _uiState.value.viewMode)
-                val instances = withContext(Dispatchers.IO) {
-                    indexManager.getCalendarEventsInRange(startRange, endRange)
-                }
-                val filtered = instances.filter { _uiState.value.activeCalendars.contains(it.event.calendarId) }
-                _uiState.update { it.copy(events = filtered) }
-                updateSelectedDayEvents(_uiState.value.selectedDate)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _uiState.update { it.copy(events = emptyList(), selectedDayEvents = emptyList()) }
+    private suspend fun loadEventsForCurrentRangeInternal() {
+        try {
+            val (startRange, endRange) = calculateRangeForMode(_uiState.value.selectedDate, _uiState.value.viewMode)
+            val instances = withContext(Dispatchers.IO) {
+                indexManager.getCalendarEventsInRange(startRange, endRange)
             }
+            val filtered = instances.filter { _uiState.value.activeCalendars.contains(it.event.calendarId) }
+            _uiState.update { it.copy(events = filtered) }
+            updateSelectedDayEvents(_uiState.value.selectedDate)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _uiState.update { it.copy(events = emptyList(), selectedDayEvents = emptyList()) }
+        }
+    }
+
+    fun loadEventsForCurrentRange() {
+        viewModelScope.launch {
+            loadEventsForCurrentRangeInternal()
         }
     }
 
@@ -249,7 +260,7 @@ class CalendarViewModel(
                     val match = Regex("""\b(\d{4}-\d{2}-\d{2})\b""").find(note.relativePath)
                     match?.value ?: dayKeyFormat.format(Date(note.createdTimestamp.takeIf { it > 0 } ?: note.lastModified))
                 }.toSet()
-                _uiState.update { it.copy(existingNoteDates = dates) }
+                _uiState.update { it.copy(existingNoteDates = dates, allVaultNotes = allNotes) }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

@@ -309,14 +309,14 @@ fun CalendarScreen(
         EventEditSheet(
             event = uiState.editingEvent,
             initialDate = Date(uiState.selectedDate),
+            availableNotes = uiState.allVaultNotes,
             onDismiss = { viewModel.dismissEditSheet() },
             onSave = { event -> viewModel.saveEvent(event) },
             onDelete = { id -> viewModel.deleteEvent(id) },
-            onCreateNoteForEvent = { title ->
-                viewModel.createNoteForEvent(title) { path ->
-                    onOpenNote(path)
-                }
-            }
+            onCreateNoteForEvent = { title, onCreated ->
+                viewModel.createNoteForEvent(title, onCreated)
+            },
+            onOpenNote = onOpenNote
         )
     }
 
@@ -435,7 +435,7 @@ private fun MonthGridView(
     val todayCal = remember { Calendar.getInstance() }
     val selectedCal = remember { Calendar.getInstance().apply { timeInMillis = selectedDate } }
 
-    val daysInMonth = remember(selectedDate, firstDayOfWeek) {
+    val daysInMonth = remember(selectedDate, firstDayOfWeek, events, existingNoteDates) {
         val cal = Calendar.getInstance().apply {
             timeInMillis = selectedDate
             set(Calendar.DAY_OF_MONTH, 1)

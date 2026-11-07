@@ -38,27 +38,35 @@ object CalendarReminderScheduler {
             return
         }
 
-        val inputData = Data.Builder()
-            .putString("event_id", event.id)
-            .putString("event_title", event.title)
-            .putLong("event_start", event.startTime)
-            .putString("linked_note", event.linkedNotePath ?: "")
-            .build()
+        try {
+            val inputData = Data.Builder()
+                .putString("event_id", event.id)
+                .putString("event_title", event.title)
+                .putLong("event_start", event.startTime)
+                .putString("linked_note", event.linkedNotePath ?: "")
+                .build()
 
-        val workRequest = OneTimeWorkRequestBuilder<CalendarReminderWorker>()
-            .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-            .setInputData(inputData)
-            .build()
+            val workRequest = OneTimeWorkRequestBuilder<CalendarReminderWorker>()
+                .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
+                .setInputData(inputData)
+                .build()
 
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            getWorkTag(event.id),
-            ExistingWorkPolicy.REPLACE,
-            workRequest
-        )
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                getWorkTag(event.id),
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun cancelReminder(context: Context, eventId: String) {
-        WorkManager.getInstance(context).cancelUniqueWork(getWorkTag(eventId))
+        try {
+            WorkManager.getInstance(context).cancelUniqueWork(getWorkTag(eventId))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 

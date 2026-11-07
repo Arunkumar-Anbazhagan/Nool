@@ -13,27 +13,36 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -55,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nool.app.ui.theme.Dimens
 import com.nool.core.model.CalendarEvent
@@ -80,16 +90,17 @@ private val EVENT_COLORS = listOf(
 fun EventEditSheet(
     event: CalendarEvent?,
     initialDate: Date = Date(),
-    availableNotes: List<com.nool.app.data.index.NoteEntity> = emptyList(),
+    availableNotes: List<com.nool.core.model.IndexedNote> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (CalendarEvent) -> Unit,
     onDelete: ((String) -> Unit)? = null,
-    onCreateNoteForEvent: ((title: String) -> Unit)? = null
+    onCreateNoteForEvent: ((title: String, onCreated: (String) -> Unit) -> Unit)? = null,
+    onOpenNote: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val initialStartCal = remember {
+    val initialStartCal = remember(event, initialDate) {
         Calendar.getInstance().apply {
             if (event != null) {
                 timeInMillis = event.startTime
@@ -104,7 +115,7 @@ fun EventEditSheet(
         }
     }
 
-    val initialEndCal = remember {
+    val initialEndCal = remember(event, initialDate) {
         (initialStartCal.clone() as Calendar).apply {
             if (event != null) {
                 timeInMillis = event.endTime
@@ -114,19 +125,22 @@ fun EventEditSheet(
         }
     }
 
-    var title by remember { mutableStateOf(event?.title ?: "") }
-    var description by remember { mutableStateOf(event?.description ?: "") }
-    var calendarId by remember { mutableStateOf(event?.calendarId ?: "Personal") }
-    var isAllDay by remember { mutableStateOf(event?.isAllDay ?: false) }
-    var selectedColor by remember { mutableStateOf(event?.colorHex ?: EVENT_COLORS[0]) }
-    var reminderMinutes by remember { mutableStateOf(event?.reminderMinutes ?: 15) }
-    var linkedNotePath by remember { mutableStateOf(event?.linkedNotePath) }
+    var title by remember(event) { mutableStateOf(event?.title ?: "") }
+    var description by remember(event) { mutableStateOf(event?.description ?: "") }
+    var calendarId by remember(event) { mutableStateOf(event?.calendarId ?: "Personal") }
+    var isAllDay by remember(event) { mutableStateOf(event?.isAllDay ?: false) }
+    var selectedColor by remember(event) { mutableStateOf(event?.colorHex ?: EVENT_COLORS[0]) }
+    var reminderMinutes by remember(event) { mutableStateOf(event?.reminderMinutes ?: 15) }
+    var linkedNotePath by remember(event) { mutableStateOf(event?.linkedNotePath) }
 
-    var startMillis by remember { mutableLongStateOf(initialStartCal.timeInMillis) }
-    var endMillis by remember { mutableLongStateOf(initialEndCal.timeInMillis) }
+    var startMillis by remember(event, initialDate) { mutableLongStateOf(initialStartCal.timeInMillis) }
+    var endMillis by remember(event, initialDate) { mutableLongStateOf(initialEndCal.timeInMillis) }
 
-    val initialRule = remember { ParsedRrule.parse(event?.rrule) }
-    var recurrenceFreq by remember { mutableStateOf(initialRule.freq) }
+    val initialRule = remember(event) { ParsedRrule.parse(event?.rrule) }
+    var recurrenceFreq by remember(event) { mutableStateOf(initialRule.freq) }
+
+    var showNotePickerDialog by remember { mutableStateOf(false) }
+    var noteSearchQuery by remember { mutableStateOf("") }
 
     val dateFormat = remember { SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()) }
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -422,32 +436,183 @@ fun EventEditSheet(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.padding(horizontal = Dimens.Spacing12, vertical = Dimens.Spacing8)
                     ) {
-                        Text(
-                            text = linkedNotePath ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        TextButton(onClick = { linkedNotePath = null }) {
-                            Text("Unlink")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(Dimens.Spacing8))
+                            Text(
+                                text = linkedNotePath ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (onOpenNote != null) {
+                                IconButton(onClick = { onOpenNote(linkedNotePath!!) }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = "Open Note",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            TextButton(onClick = { linkedNotePath = null }) {
+                                Text("Unlink")
+                            }
                         }
                     }
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing8)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing8),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     OutlinedButton(
                         onClick = {
-                            if (title.isNotBlank() && onCreateNoteForEvent != null) {
-                                onCreateNoteForEvent(title)
-                                linkedNotePath = "Notes/${title.trim()}.md"
+                            noteSearchQuery = ""
+                            showNotePickerDialog = true
+                        },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(Dimens.Spacing4))
+                        Text("Link note", maxLines = 1)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val effectiveTitle = if (title.isNotBlank()) title.trim() else "Event ${dateFormat.format(Date(startMillis))}"
+                            if (title.isBlank()) {
+                                title = effectiveTitle
+                            }
+                            onCreateNoteForEvent?.invoke(effectiveTitle) { path ->
+                                linkedNotePath = path
                             }
                         },
-                        shape = MaterialTheme.shapes.small
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(Dimens.Spacing4))
-                        Text("Create note for this event")
+                        Text("Create note", maxLines = 1)
                     }
                 }
+            }
+
+            if (showNotePickerDialog) {
+                AlertDialog(
+                    onDismissRequest = { showNotePickerDialog = false },
+                    title = {
+                        Text("Link Existing Note", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Column(modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp)) {
+                            OutlinedTextField(
+                                value = noteSearchQuery,
+                                onValueChange = { noteSearchQuery = it },
+                                placeholder = { Text("Search notes...") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                trailingIcon = if (noteSearchQuery.isNotEmpty()) {
+                                    {
+                                        IconButton(onClick = { noteSearchQuery = "" }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                                        }
+                                    }
+                                } else null,
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            Spacer(modifier = Modifier.height(Dimens.Spacing8))
+                            val filteredNotes = remember(availableNotes, noteSearchQuery) {
+                                if (noteSearchQuery.isBlank()) {
+                                    availableNotes
+                                } else {
+                                    availableNotes.filter {
+                                        it.title.contains(noteSearchQuery, ignoreCase = true) ||
+                                        it.relativePath.contains(noteSearchQuery, ignoreCase = true)
+                                    }
+                                }
+                            }
+                            if (filteredNotes.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(Dimens.Spacing24),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        if (availableNotes.isEmpty()) "No notes found in vault" else "No matching notes",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                                    verticalArrangement = Arrangement.spacedBy(Dimens.Spacing4)
+                                ) {
+                                    items(filteredNotes, key = { it.relativePath }) { note ->
+                                        Surface(
+                                            shape = MaterialTheme.shapes.small,
+                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    linkedNotePath = note.relativePath
+                                                    showNotePickerDialog = false
+                                                }
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = Dimens.Spacing12, vertical = Dimens.Spacing8)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Description,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(Dimens.Spacing8))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = note.title.ifBlank { note.relativePath.substringAfterLast("/").removeSuffix(".md") },
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = note.relativePath,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.outline,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { showNotePickerDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(Dimens.Spacing16))
