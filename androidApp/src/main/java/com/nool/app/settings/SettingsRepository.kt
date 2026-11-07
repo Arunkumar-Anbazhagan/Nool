@@ -5,11 +5,14 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "nool_settings")
 
@@ -71,96 +74,108 @@ class SettingsRepository(
         private val KEY_CALENDAR_DEFAULT_CALENDAR = stringPreferencesKey("calendar_default_calendar")
     }
 
-    val themeMode: Flow<ThemeMode> = dataStore?.data?.map { prefs ->
+    private val safePrefsFlow: Flow<Preferences> = dataStore?.data?.catch { exception ->
+        if (exception is IOException) {
+            emit(emptyPreferences())
+        } else {
+            throw exception
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyPreferences())
+
+    val themeMode: Flow<ThemeMode> = safePrefsFlow.map { prefs ->
         val raw = prefs[KEY_THEME_MODE] ?: ThemeMode.SYSTEM.name
         try { ThemeMode.valueOf(raw) } catch (e: Exception) { ThemeMode.SYSTEM }
-    } ?: kotlinx.coroutines.flow.flowOf(ThemeMode.SYSTEM)
+    }
 
-    val dynamicColor: Flow<Boolean> = dataStore?.data?.map { prefs ->
+    val dynamicColor: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_DYNAMIC_COLOR] ?: true
-    } ?: kotlinx.coroutines.flow.flowOf(true)
+    }
 
-    val fontSize: Flow<Int> = dataStore?.data?.map { prefs ->
+    val fontSize: Flow<Int> = safePrefsFlow.map { prefs ->
         prefs[KEY_FONT_SIZE] ?: 16
-    } ?: kotlinx.coroutines.flow.flowOf(16)
+    }
 
-    val noteLayoutMode: Flow<NoteLayoutMode> = dataStore?.data?.map { prefs ->
+    val noteLayoutMode: Flow<NoteLayoutMode> = safePrefsFlow.map { prefs ->
         val raw = prefs[KEY_NOTE_LAYOUT_MODE] ?: NoteLayoutMode.LIST.name
         try { NoteLayoutMode.valueOf(raw) } catch (e: Exception) { NoteLayoutMode.LIST }
-    } ?: kotlinx.coroutines.flow.flowOf(NoteLayoutMode.LIST)
+    }
 
-    val sortOption: Flow<SortOption> = dataStore?.data?.map { prefs ->
+    val sortOption: Flow<SortOption> = safePrefsFlow.map { prefs ->
         val raw = prefs[KEY_SORT_OPTION] ?: SortOption.MODIFIED_DESC.name
         try { SortOption.valueOf(raw) } catch (e: Exception) { SortOption.MODIFIED_DESC }
-    } ?: kotlinx.coroutines.flow.flowOf(SortOption.MODIFIED_DESC)
+    }
 
-    val showArchived: Flow<Boolean> = dataStore?.data?.map { prefs ->
+    val showArchived: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_SHOW_ARCHIVED] ?: false
-    } ?: kotlinx.coroutines.flow.flowOf(false)
+    }
 
-    val pureBlack: Flow<Boolean> = dataStore?.data?.map { prefs ->
+    val pureBlack: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_PURE_BLACK] ?: false
-    } ?: kotlinx.coroutines.flow.flowOf(false)
+    }
 
-    val templatesFolder: Flow<String> = dataStore?.data?.map { prefs ->
+    val templatesFolder: Flow<String> = safePrefsFlow.map { prefs ->
         prefs[KEY_TEMPLATES_FOLDER] ?: "Templates"
-    } ?: kotlinx.coroutines.flow.flowOf("Templates")
+    }
 
-    val dailyNotesFolder: Flow<String> = dataStore?.data?.map { prefs ->
+    val dailyNotesFolder: Flow<String> = safePrefsFlow.map { prefs ->
         prefs[KEY_DAILY_NOTES_FOLDER] ?: "Daily Notes"
-    } ?: kotlinx.coroutines.flow.flowOf("Daily Notes")
+    }
 
-    val autoSave: Flow<Boolean> = dataStore?.data?.map { prefs ->
+    val autoSave: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_AUTO_SAVE] ?: true
-    } ?: kotlinx.coroutines.flow.flowOf(true)
+    }
 
-    val biometricLock: Flow<Boolean> = dataStore?.data?.map { prefs ->
+    val biometricLock: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_BIOMETRIC_LOCK] ?: false
-    } ?: kotlinx.coroutines.flow.flowOf(false)
+    }
 
-    val calendarDefaultView: Flow<CalendarDefaultView> = dataStore?.data?.map { prefs ->
+    val calendarDefaultView: Flow<CalendarDefaultView> = safePrefsFlow.map { prefs ->
         val raw = prefs[KEY_CALENDAR_DEFAULT_VIEW] ?: CalendarDefaultView.MONTH.name
         try { CalendarDefaultView.valueOf(raw) } catch (e: Exception) { CalendarDefaultView.MONTH }
-    } ?: kotlinx.coroutines.flow.flowOf(CalendarDefaultView.MONTH)
+    }
 
-    val calendarFirstDayOfWeek: Flow<Int> = dataStore?.data?.map { prefs ->
+    val calendarFirstDayOfWeek: Flow<Int> = safePrefsFlow.map { prefs ->
         prefs[KEY_CALENDAR_FIRST_DAY] ?: java.util.Calendar.MONDAY
-    } ?: kotlinx.coroutines.flow.flowOf(java.util.Calendar.MONDAY)
+    }
 
-    val calendarDefaultReminderMinutes: Flow<Int> = dataStore?.data?.map { prefs ->
+    val calendarDefaultReminderMinutes: Flow<Int> = safePrefsFlow.map { prefs ->
         prefs[KEY_CALENDAR_DEFAULT_REMINDER] ?: 15
-    } ?: kotlinx.coroutines.flow.flowOf(15)
+    }
 
-    val calendarDefaultCalendar: Flow<String> = dataStore?.data?.map { prefs ->
+    val calendarDefaultCalendar: Flow<String> = safePrefsFlow.map { prefs ->
         prefs[KEY_CALENDAR_DEFAULT_CALENDAR] ?: "Personal"
-    } ?: kotlinx.coroutines.flow.flowOf("Personal")
+    }
 
-    val savedSearches: Flow<List<SavedSearch>> = dataStore?.data?.map { prefs ->
+    val savedSearches: Flow<List<SavedSearch>> = safePrefsFlow.map { prefs ->
         val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
         deserializeSavedSearches(raw)
-    } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }
 
     suspend fun saveSearch(name: String, query: String): SavedSearch {
         val newSearch = SavedSearch(name = name.trim(), query = query.trim())
-        dataStore?.edit { prefs ->
-            val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
-            val current = deserializeSavedSearches(raw).toMutableList()
-            val existingIndex = current.indexOfFirst { it.name.equals(name.trim(), ignoreCase = true) }
-            if (existingIndex >= 0) {
-                current[existingIndex] = newSearch
-            } else {
-                current.add(newSearch)
+        runCatching {
+            dataStore?.edit { prefs ->
+                val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
+                val current = deserializeSavedSearches(raw).toMutableList()
+                val existingIndex = current.indexOfFirst { it.name.equals(name.trim(), ignoreCase = true) }
+                if (existingIndex >= 0) {
+                    current[existingIndex] = newSearch
+                } else {
+                    current.add(newSearch)
+                }
+                prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
             }
-            prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
         }
         return newSearch
     }
 
     suspend fun deleteSavedSearch(id: String) {
-        dataStore?.edit { prefs ->
-            val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
-            val current = deserializeSavedSearches(raw).filter { it.id != id }
-            prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
+        runCatching {
+            dataStore?.edit { prefs ->
+                val raw = prefs[KEY_SAVED_SEARCHES] ?: ""
+                val current = deserializeSavedSearches(raw).filter { it.id != id }
+                prefs[KEY_SAVED_SEARCHES] = serializeSavedSearches(current)
+            }
         }
     }
 
@@ -198,62 +213,62 @@ class SettingsRepository(
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        dataStore?.edit { it[KEY_THEME_MODE] = mode.name }
+        runCatching { dataStore?.edit { it[KEY_THEME_MODE] = mode.name } }
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
-        dataStore?.edit { it[KEY_DYNAMIC_COLOR] = enabled }
+        runCatching { dataStore?.edit { it[KEY_DYNAMIC_COLOR] = enabled } }
     }
 
     suspend fun setFontSize(size: Int) {
-        dataStore?.edit { it[KEY_FONT_SIZE] = size.coerceIn(12, 24) }
+        runCatching { dataStore?.edit { it[KEY_FONT_SIZE] = size.coerceIn(12, 24) } }
     }
 
     suspend fun setNoteLayoutMode(mode: NoteLayoutMode) {
-        dataStore?.edit { it[KEY_NOTE_LAYOUT_MODE] = mode.name }
+        runCatching { dataStore?.edit { it[KEY_NOTE_LAYOUT_MODE] = mode.name } }
     }
 
     suspend fun setSortOption(option: SortOption) {
-        dataStore?.edit { it[KEY_SORT_OPTION] = option.name }
+        runCatching { dataStore?.edit { it[KEY_SORT_OPTION] = option.name } }
     }
 
     suspend fun setShowArchived(show: Boolean) {
-        dataStore?.edit { it[KEY_SHOW_ARCHIVED] = show }
+        runCatching { dataStore?.edit { it[KEY_SHOW_ARCHIVED] = show } }
     }
 
     suspend fun setPureBlack(enabled: Boolean) {
-        dataStore?.edit { it[KEY_PURE_BLACK] = enabled }
+        runCatching { dataStore?.edit { it[KEY_PURE_BLACK] = enabled } }
     }
 
     suspend fun setTemplatesFolder(folder: String) {
-        dataStore?.edit { it[KEY_TEMPLATES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") }
+        runCatching { dataStore?.edit { it[KEY_TEMPLATES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") } }
     }
 
     suspend fun setDailyNotesFolder(folder: String) {
-        dataStore?.edit { it[KEY_DAILY_NOTES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") }
+        runCatching { dataStore?.edit { it[KEY_DAILY_NOTES_FOLDER] = folder.trim().removePrefix("/").removeSuffix("/") } }
     }
 
     suspend fun setAutoSave(enabled: Boolean) {
-        dataStore?.edit { it[KEY_AUTO_SAVE] = enabled }
+        runCatching { dataStore?.edit { it[KEY_AUTO_SAVE] = enabled } }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {
-        dataStore?.edit { it[KEY_BIOMETRIC_LOCK] = enabled }
+        runCatching { dataStore?.edit { it[KEY_BIOMETRIC_LOCK] = enabled } }
     }
 
     suspend fun setCalendarDefaultView(view: CalendarDefaultView) {
-        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_VIEW] = view.name }
+        runCatching { dataStore?.edit { it[KEY_CALENDAR_DEFAULT_VIEW] = view.name } }
     }
 
     suspend fun setCalendarFirstDayOfWeek(day: Int) {
-        dataStore?.edit { it[KEY_CALENDAR_FIRST_DAY] = day }
+        runCatching { dataStore?.edit { it[KEY_CALENDAR_FIRST_DAY] = day } }
     }
 
     suspend fun setCalendarDefaultReminderMinutes(minutes: Int) {
-        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_REMINDER] = minutes }
+        runCatching { dataStore?.edit { it[KEY_CALENDAR_DEFAULT_REMINDER] = minutes } }
     }
 
     suspend fun setCalendarDefaultCalendar(name: String) {
-        dataStore?.edit { it[KEY_CALENDAR_DEFAULT_CALENDAR] = name.trim() }
+        runCatching { dataStore?.edit { it[KEY_CALENDAR_DEFAULT_CALENDAR] = name.trim() } }
     }
 }

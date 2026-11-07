@@ -88,90 +88,147 @@ class SettingsViewModel(
 
     fun loadVaultStats() {
         viewModelScope.launch {
-            val notes = withContext(Dispatchers.IO) {
-                vaultRepository.getIndexManager().getAllNotes()
+            try {
+                val notes = withContext(Dispatchers.IO) {
+                    vaultRepository.getIndexManager().getAllNotes()
+                }
+                val count = notes.size
+                val size = notes.sumOf { it.size.coerceAtLeast(0L) }
+                _vaultStats.value = VaultStats(noteCount = count, totalSizeBytes = size)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _vaultStats.value = VaultStats()
             }
-            val count = notes.size
-            val size = notes.sumOf { it.size }
-            _vaultStats.value = VaultStats(noteCount = count, totalSizeBytes = size)
         }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
-            settingsRepository.setThemeMode(mode)
+            try {
+                settingsRepository.setThemeMode(mode)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setDynamicColor(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setDynamicColor(enabled)
+            try {
+                settingsRepository.setDynamicColor(enabled)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setPureBlack(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setPureBlack(enabled)
+            try {
+                settingsRepository.setPureBlack(enabled)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setFontSize(size: Int) {
         viewModelScope.launch {
-            settingsRepository.setFontSize(size)
+            try {
+                settingsRepository.setFontSize(size)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setNoteLayoutMode(mode: NoteLayoutMode) {
         viewModelScope.launch {
-            settingsRepository.setNoteLayoutMode(mode)
+            try {
+                settingsRepository.setNoteLayoutMode(mode)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setTemplatesFolder(folder: String) {
         viewModelScope.launch {
-            settingsRepository.setTemplatesFolder(folder)
+            try {
+                settingsRepository.setTemplatesFolder(folder)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setDailyNotesFolder(folder: String) {
         viewModelScope.launch {
-            settingsRepository.setDailyNotesFolder(folder)
+            try {
+                settingsRepository.setDailyNotesFolder(folder)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setAutoSave(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setAutoSave(enabled)
+            try {
+                settingsRepository.setAutoSave(enabled)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setBiometricLock(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setBiometricLock(enabled)
+            try {
+                settingsRepository.setBiometricLock(enabled)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setCalendarDefaultView(view: CalendarDefaultView) {
         viewModelScope.launch {
-            settingsRepository.setCalendarDefaultView(view)
+            try {
+                settingsRepository.setCalendarDefaultView(view)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setCalendarFirstDayOfWeek(firstDay: Int) {
         viewModelScope.launch {
-            settingsRepository.setCalendarFirstDayOfWeek(firstDay)
+            try {
+                settingsRepository.setCalendarFirstDayOfWeek(firstDay)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setCalendarDefaultReminderMinutes(minutes: Int) {
         viewModelScope.launch {
-            settingsRepository.setCalendarDefaultReminderMinutes(minutes)
+            try {
+                settingsRepository.setCalendarDefaultReminderMinutes(minutes)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun setCalendarDefaultCalendar(name: String) {
         viewModelScope.launch {
-            settingsRepository.setCalendarDefaultCalendar(name)
+            try {
+                settingsRepository.setCalendarDefaultCalendar(name)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

@@ -19,7 +19,11 @@ sealed class Screen(val route: String) {
         }
 
         fun decodePath(encodedPath: String): String {
-            return URLDecoder.decode(encodedPath, StandardCharsets.UTF_8.toString())
+            return try {
+                URLDecoder.decode(encodedPath, StandardCharsets.UTF_8.toString())
+            } catch (e: Exception) {
+                encodedPath
+            }
         }
     }
 

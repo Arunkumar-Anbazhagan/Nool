@@ -97,17 +97,21 @@ class SqlDelightIndexManager(
     }
 
     suspend fun getAllNotes(): List<IndexedNote> = withContext(ioDispatcher) {
-        database.noolIndexQueries.getAllNotes().executeAsList().map { it.toIndexedNote() }
+        runCatching {
+            database.noolIndexQueries.getAllNotes().executeAsList().map { it.toIndexedNote() }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun getNoteCatalog(): List<NoteTitleAndPath> = withContext(ioDispatcher) {
-        database.noolIndexQueries.getAllNoteTitlesAndPaths().executeAsList().map {
-            NoteTitleAndPath(
-                title = it.title,
-                relativePath = it.relativePath,
-                aliases = it.aliases
-            )
-        }
+        runCatching {
+            database.noolIndexQueries.getAllNoteTitlesAndPaths().executeAsList().map {
+                NoteTitleAndPath(
+                    title = it.title,
+                    relativePath = it.relativePath,
+                    aliases = it.aliases
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun getBacklinks(targetRelativePath: String): List<BacklinkItem> = withContext(ioDispatcher) {
