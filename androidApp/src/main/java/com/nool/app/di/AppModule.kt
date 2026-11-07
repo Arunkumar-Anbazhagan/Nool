@@ -7,6 +7,7 @@ import com.nool.app.data.git.GitCredentialsStore
 import com.nool.app.data.git.GitRepository
 import com.nool.app.data.git.GitRepositoryImpl
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.nool.core.index.db.NoolDatabase
 import com.nool.core.index.SqlDelightIndexManager
 import com.nool.core.index.VaultWatcher
@@ -32,7 +33,39 @@ import org.koin.dsl.module
 val appModule = module {
     single { FileManager(androidContext()) }
     single {
-        val driver = AndroidSqliteDriver(NoolDatabase.Schema, androidContext(), "nool_index_v3.db")
+        val schema = NoolDatabase.Schema
+        val callback = object : AndroidSqliteDriver.Callback(schema) {
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS calendar_events (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        calendarId TEXT NOT NULL DEFAULT 'Personal',
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL DEFAULT '',
+                        startTime INTEGER NOT NULL,
+                        endTime INTEGER NOT NULL,
+                        isAllDay INTEGER NOT NULL DEFAULT 0,
+                        colorHex TEXT NOT NULL DEFAULT '#6750A4',
+                        rrule TEXT,
+                        reminderMinutes INTEGER NOT NULL DEFAULT 15,
+                        linkedNotePath TEXT,
+                        createdTimestamp INTEGER NOT NULL DEFAULT 0,
+                        lastModified INTEGER NOT NULL DEFAULT 0
+                    );
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_start_end ON calendar_events(startTime, endTime);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_calendar ON calendar_events(calendarId);")
+            }
+        }
+        val driver = AndroidSqliteDriver(
+            schema = schema,
+            context = androidContext(),
+            name = "nool_index_v4.db",
+            callback = callback
+        )
         NoolDatabase(driver)
     }
     single { SqlDelightIndexManager(get()) }

@@ -1002,7 +1002,7 @@ private fun AgendaListView(
     ) {
         grouped.forEach { (dateKey, dayInstances) ->
             item(key = "header_$dateKey") {
-                val date = dayFormat.parse(dateKey) ?: Date()
+                val date = try { dayFormat.parse(dateKey) ?: Date() } catch (e: Exception) { Date() }
                 Text(
                     text = dayHeaderFormat.format(date),
                     style = MaterialTheme.typography.titleSmall,

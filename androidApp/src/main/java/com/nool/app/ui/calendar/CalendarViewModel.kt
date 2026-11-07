@@ -150,84 +150,109 @@ class CalendarViewModel(
 
     fun saveEvent(event: CalendarEvent) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                indexManager.upsertCalendarEvent(event)
-                CalendarReminderScheduler.scheduleReminder(context, event)
+            try {
+                withContext(Dispatchers.IO) {
+                    indexManager.upsertCalendarEvent(event)
+                    CalendarReminderScheduler.scheduleReminder(context, event)
+                }
+                loadEventsForCurrentRange()
+                updateSelectedDayEvents(_uiState.value.selectedDate)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            loadEventsForCurrentRange()
-            updateSelectedDayEvents(_uiState.value.selectedDate)
         }
     }
 
     fun deleteEvent(eventId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                indexManager.deleteCalendarEvent(eventId)
-                CalendarReminderScheduler.cancelReminder(context, eventId)
+            try {
+                withContext(Dispatchers.IO) {
+                    indexManager.deleteCalendarEvent(eventId)
+                    CalendarReminderScheduler.cancelReminder(context, eventId)
+                }
+                loadEventsForCurrentRange()
+                updateSelectedDayEvents(_uiState.value.selectedDate)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            loadEventsForCurrentRange()
-            updateSelectedDayEvents(_uiState.value.selectedDate)
         }
     }
 
     fun createNoteForEvent(title: String, onCreated: (String) -> Unit) {
         viewModelScope.launch {
-            val noteTitle = "Event - ${title.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "_")}"
-            val initialContent = buildString {
-                appendLine("---")
-                appendLine("title: \"$title\"")
-                appendLine("tags: [event, calendar]")
-                appendLine("created: ${dayKeyFormat.format(Date())}")
-                appendLine("---")
-                appendLine()
-                appendLine("# $title")
-                appendLine()
-                appendLine("## Agenda & Notes")
-                appendLine("- ")
+            try {
+                val noteTitle = "Event - ${title.trim().replace(Regex("[/\\\\?%*:|\"<>]"), "_")}"
+                val initialContent = buildString {
+                    appendLine("---")
+                    appendLine("title: \"$title\"")
+                    appendLine("tags: [event, calendar]")
+                    appendLine("created: ${dayKeyFormat.format(Date())}")
+                    appendLine("---")
+                    appendLine()
+                    appendLine("# $title")
+                    appendLine()
+                    appendLine("## Agenda & Notes")
+                    appendLine("- ")
+                }
+                val result = vaultRepository.createNote("Notes", noteTitle, initialContent)
+                val createdPath = result.getOrNull()?.relativePath ?: "Notes/$noteTitle.md"
+                loadNoteDates()
+                onCreated(createdPath)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            val result = vaultRepository.createNote("Notes", noteTitle, initialContent)
-            val createdPath = result.getOrNull()?.relativePath ?: "Notes/$noteTitle.md"
-            loadNoteDates()
-            onCreated(createdPath)
         }
     }
 
     private fun loadEventsForCurrentRange() {
         viewModelScope.launch {
-            val (startRange, endRange) = calculateRangeForMode(_uiState.value.selectedDate, _uiState.value.viewMode)
-            val instances = withContext(Dispatchers.IO) {
-                indexManager.getCalendarEventsInRange(startRange, endRange)
+            try {
+                val (startRange, endRange) = calculateRangeForMode(_uiState.value.selectedDate, _uiState.value.viewMode)
+                val instances = withContext(Dispatchers.IO) {
+                    indexManager.getCalendarEventsInRange(startRange, endRange)
+                }
+                val filtered = instances.filter { _uiState.value.activeCalendars.contains(it.event.calendarId) }
+                _uiState.update { it.copy(events = filtered) }
+                updateSelectedDayEvents(_uiState.value.selectedDate)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update { it.copy(events = emptyList(), selectedDayEvents = emptyList()) }
             }
-            val filtered = instances.filter { _uiState.value.activeCalendars.contains(it.event.calendarId) }
-            _uiState.update { it.copy(events = filtered) }
-            updateSelectedDayEvents(_uiState.value.selectedDate)
         }
     }
 
     private fun updateSelectedDayEvents(dateMillis: Long) {
-        val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
-        val startOfDay = Calendar.getInstance().apply {
-            set(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        try {
+            val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
+            val startOfDay = Calendar.getInstance().apply {
+                set(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val endOfDay = startOfDay + 86_400_000L - 1
+            val endOfDay = startOfDay + 86_400_000L - 1
 
-        val matching = _uiState.value.events.filter { instance ->
-            instance.instanceEndTime >= startOfDay && instance.instanceStartTime <= endOfDay
+            val matching = _uiState.value.events.filter { instance ->
+                instance.instanceEndTime >= startOfDay && instance.instanceStartTime <= endOfDay
+            }
+            _uiState.update { it.copy(selectedDayEvents = matching) }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        _uiState.update { it.copy(selectedDayEvents = matching) }
     }
 
     private fun loadNoteDates() {
         viewModelScope.launch {
-            val allNotes = withContext(Dispatchers.IO) { indexManager.getAllNotes() }
-            val dates = allNotes.mapNotNull { note ->
-                // Check note relative path or lastModified
-                val match = Regex("""\b(\d{4}-\d{2}-\d{2})\b""").find(note.relativePath)
-                match?.value ?: dayKeyFormat.format(Date(note.createdTimestamp.takeIf { it > 0 } ?: note.lastModified))
-            }.toSet()
-            _uiState.update { it.copy(existingNoteDates = dates) }
+            try {
+                val allNotes = withContext(Dispatchers.IO) { indexManager.getAllNotes() }
+                val dates = allNotes.mapNotNull { note ->
+                    // Check note relative path or lastModified
+                    val match = Regex("""\b(\d{4}-\d{2}-\d{2})\b""").find(note.relativePath)
+                    match?.value ?: dayKeyFormat.format(Date(note.createdTimestamp.takeIf { it > 0 } ?: note.lastModified))
+                }.toSet()
+                _uiState.update { it.copy(existingNoteDates = dates) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

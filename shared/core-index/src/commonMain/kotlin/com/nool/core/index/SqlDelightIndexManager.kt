@@ -313,44 +313,56 @@ class SqlDelightIndexManager(
     }
 
     suspend fun upsertCalendarEvent(event: CalendarEvent): Unit = withContext(ioDispatcher) {
-        database.noolIndexQueries.upsertCalendarEvent(
-            id = event.id,
-            calendarId = event.calendarId,
-            title = event.title,
-            description = event.description,
-            startTime = event.startTime,
-            endTime = event.endTime,
-            isAllDay = event.isAllDay,
-            colorHex = event.colorHex,
-            rrule = event.rrule,
-            reminderMinutes = event.reminderMinutes.toLong(),
-            linkedNotePath = event.linkedNotePath,
-            createdTimestamp = event.createdTimestamp,
-            lastModified = event.lastModified
-        )
+        runCatching {
+            database.noolIndexQueries.upsertCalendarEvent(
+                id = event.id,
+                calendarId = event.calendarId,
+                title = event.title,
+                description = event.description,
+                startTime = event.startTime,
+                endTime = event.endTime,
+                isAllDay = event.isAllDay,
+                colorHex = event.colorHex,
+                rrule = event.rrule,
+                reminderMinutes = event.reminderMinutes.toLong(),
+                linkedNotePath = event.linkedNotePath,
+                createdTimestamp = event.createdTimestamp,
+                lastModified = event.lastModified
+            )
+        }
     }
 
     suspend fun deleteCalendarEvent(id: String): Unit = withContext(ioDispatcher) {
-        database.noolIndexQueries.deleteCalendarEvent(id)
+        runCatching {
+            database.noolIndexQueries.deleteCalendarEvent(id)
+        }
     }
 
     suspend fun getCalendarEvent(id: String): CalendarEvent? = withContext(ioDispatcher) {
-        database.noolIndexQueries.getCalendarEvent(id).executeAsOneOrNull()?.toCalendarEvent()
+        runCatching {
+            database.noolIndexQueries.getCalendarEvent(id).executeAsOneOrNull()?.toCalendarEvent()
+        }.getOrNull()
     }
 
     suspend fun getAllCalendarEvents(): List<CalendarEvent> = withContext(ioDispatcher) {
-        database.noolIndexQueries.getAllCalendarEvents().executeAsList().map { it.toCalendarEvent() }
+        runCatching {
+            database.noolIndexQueries.getAllCalendarEvents().executeAsList().map { it.toCalendarEvent() }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun getCalendarEventsInRange(rangeStart: Long, rangeEnd: Long): List<CalendarEventInstance> = withContext(ioDispatcher) {
-        val rawEvents = database.noolIndexQueries.getEventsInRange(rangeStart = rangeStart, rangeEnd = rangeEnd).executeAsList().map { it.toCalendarEvent() }
-        rawEvents.flatMap { event ->
-            RruleExpander.expand(event, rangeStart, rangeEnd)
-        }.sortedBy { it.instanceStartTime }
+        runCatching {
+            val rawEvents = database.noolIndexQueries.getEventsInRange(rangeStart = rangeStart, rangeEnd = rangeEnd).executeAsList().map { it.toCalendarEvent() }
+            rawEvents.flatMap { event ->
+                RruleExpander.expand(event, rangeStart, rangeEnd)
+            }.sortedBy { it.instanceStartTime }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun getEventsForNote(notePath: String): List<CalendarEvent> = withContext(ioDispatcher) {
-        database.noolIndexQueries.getEventsForNote(notePath).executeAsList().map { it.toCalendarEvent() }
+        runCatching {
+            database.noolIndexQueries.getEventsForNote(notePath).executeAsList().map { it.toCalendarEvent() }
+        }.getOrDefault(emptyList())
     }
 
     private fun com.nool.core.index.db.Calendar_events.toCalendarEvent(): CalendarEvent = CalendarEvent(
