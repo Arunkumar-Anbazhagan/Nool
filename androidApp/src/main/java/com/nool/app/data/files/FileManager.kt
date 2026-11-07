@@ -228,8 +228,9 @@ Enjoy writing!
 
     suspend fun saveNoteContent(relativePath: String, content: String): Unit = withContext(Dispatchers.IO) {
         val file = resolveSafe(relativePath)
-        if (!file.parentFile!!.exists()) {
-            file.parentFile!!.mkdirs()
+        val parent = file.parentFile ?: vaultRoot
+        if (!parent.exists()) {
+            parent.mkdirs()
         }
         atomicWrite(file, content)
     }
@@ -327,6 +328,9 @@ Enjoy writing!
 
     private fun atomicWrite(file: File, content: String) {
         val parent = file.parentFile ?: vaultRoot
+        if (!parent.exists()) {
+            parent.mkdirs()
+        }
         val tempFile = File(parent, ".${file.name}.tmp")
         try {
             FileOutputStream(tempFile).use { fos ->
@@ -338,8 +342,12 @@ Enjoy writing!
                 file.delete()
             }
             if (!tempFile.renameTo(file)) {
-                throw IOException("Failed to replace file during atomic write: ${file.name}")
+                // Direct fallback write if rename fails
+                file.writeText(content, Charsets.UTF_8)
             }
+        } catch (e: Exception) {
+            // Safe direct write fallback
+            file.writeText(content, Charsets.UTF_8)
         } finally {
             if (tempFile.exists()) {
                 tempFile.delete()

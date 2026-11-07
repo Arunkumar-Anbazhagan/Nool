@@ -36,7 +36,9 @@ class VaultRepositoryImpl(
         content: String
     ): Result<VaultItem.NoteItem> = runCatching {
         val note = fileManager.createNote(folderRelativePath, title, content)
-        indexManager.indexFile(File(fileManager.vaultRoot, note.relativePath))
+        runCatching {
+            indexManager.indexFile(File(fileManager.vaultRoot, note.relativePath))
+        }
         notifyChanged()
         note
     }
@@ -54,7 +56,9 @@ class VaultRepositoryImpl(
 
     override suspend fun saveNoteContent(relativePath: String, content: String): Result<Unit> = runCatching {
         fileManager.saveNoteContent(relativePath, content)
-        indexManager.indexFile(File(fileManager.vaultRoot, relativePath))
+        runCatching {
+            indexManager.indexFile(File(fileManager.vaultRoot, relativePath))
+        }
         notifyChanged()
     }
 

@@ -38,52 +38,58 @@ class SqlDelightIndexManager(
             return@withContext
         }
 
-        val fileName = if (cleanRelative.contains('/')) cleanRelative.substringAfterLast('/') else cleanRelative
-        val title = fileName.removeSuffix(".md")
-        val folder = if (cleanRelative.contains('/')) cleanRelative.substringBeforeLast('/') else ""
+        runCatching {
+            val fileName = if (cleanRelative.contains('/')) cleanRelative.substringAfterLast('/') else cleanRelative
+            val title = fileName.removeSuffix(".md")
+            val folder = if (cleanRelative.contains('/')) cleanRelative.substringBeforeLast('/') else ""
 
-        val parsed = FrontmatterAndTagParser.parse(content)
+            val parsed = FrontmatterAndTagParser.parse(content)
 
-        database.noolIndexQueries.upsertNote(
-            relativePath = cleanRelative,
-            title = title,
-            folderPath = folder,
-            content = parsed.bodyText,
-            excerpt = extractExcerpt(parsed.bodyText),
-            lastModified = lastModified,
-            createdTimestamp = lastModified,
-            size = size,
-            isPinned = parsed.isPinned,
-            isFavorite = parsed.isFavorite,
-            isArchived = parsed.isArchived,
-            tags = parsed.tags.joinToString(","),
-            aliases = parsed.aliases.joinToString(","),
-            noteType = parsed.noteType
-        )
-
-        // Index wiki-links
-        val allNotes = getNoteCatalog()
-        val parsedLinks = WikiLinkParser.parseLinks(content)
-
-        database.noolIndexQueries.deleteLinksForSource(cleanRelative)
-        for (link in parsedLinks) {
-            val resolved = LinkResolver.resolveLink(link.target, cleanRelative, allNotes)
-            database.noolIndexQueries.insertLink(
-                sourcePath = cleanRelative,
-                rawTarget = link.target + (if (link.heading != null) "#${link.heading}" else "") + (if (link.alias != null) "|${link.alias}" else ""),
-                targetTitle = link.target,
-                targetHeading = link.heading,
-                alias = link.alias,
-                isEmbed = link.isEmbed,
-                resolvedPath = resolved
+            database.noolIndexQueries.upsertNote(
+                relativePath = cleanRelative,
+                title = title,
+                folderPath = folder,
+                content = parsed.bodyText,
+                excerpt = extractExcerpt(parsed.bodyText),
+                lastModified = lastModified,
+                createdTimestamp = lastModified,
+                size = size,
+                isPinned = parsed.isPinned,
+                isFavorite = parsed.isFavorite,
+                isArchived = parsed.isArchived,
+                tags = parsed.tags.joinToString(","),
+                aliases = parsed.aliases.joinToString(","),
+                noteType = parsed.noteType
             )
+
+            // Index wiki-links
+            val allNotes = getNoteCatalog()
+            val parsedLinks = WikiLinkParser.parseLinks(content)
+
+            database.noolIndexQueries.deleteLinksForSource(cleanRelative)
+            for (link in parsedLinks) {
+                val resolved = LinkResolver.resolveLink(link.target, cleanRelative, allNotes)
+                database.noolIndexQueries.insertLink(
+                    sourcePath = cleanRelative,
+                    rawTarget = link.target + (if (link.heading != null) "#${link.heading}" else "") + (if (link.alias != null) "|${link.alias}" else ""),
+                    targetTitle = link.target,
+                    targetHeading = link.heading,
+                    alias = link.alias,
+                    isEmbed = link.isEmbed,
+                    resolvedPath = resolved
+                )
+            }
+        }.onFailure { e ->
+            println("Warning: failed to index note '$cleanRelative': $e")
         }
     }
 
     suspend fun removeNote(relativePath: String): Unit = withContext(ioDispatcher) {
-        val clean = relativePath.trim().removePrefix("/").replace('\\', '/')
-        database.noolIndexQueries.deleteNote(clean)
-        database.noolIndexQueries.deleteLinksForSource(clean)
+        runCatching {
+            val clean = relativePath.trim().removePrefix("/").replace('\\', '/')
+            database.noolIndexQueries.deleteNote(clean)
+            database.noolIndexQueries.deleteLinksForSource(clean)
+        }
     }
 
     suspend fun clearAll(): Unit = withContext(ioDispatcher) {
@@ -115,66 +121,70 @@ class SqlDelightIndexManager(
     }
 
     suspend fun getBacklinks(targetRelativePath: String): List<BacklinkItem> = withContext(ioDispatcher) {
-        val clean = targetRelativePath.trim().removePrefix("/").replace('\\', '/')
-        val note = database.noolIndexQueries.getNote(clean).executeAsOneOrNull() ?: return@withContext emptyList()
-        val links = database.noolIndexQueries.getBacklinksForNote(
-            resolvedPath = note.relativePath,
-            targetTitle = note.title
-        ).executeAsList()
+        runCatching {
+            val clean = targetRelativePath.trim().removePrefix("/").replace('\\', '/')
+            val note = database.noolIndexQueries.getNote(clean).executeAsOneOrNull() ?: return@runCatching emptyList()
+            val links = database.noolIndexQueries.getBacklinksForNote(
+                resolvedPath = note.relativePath,
+                targetTitle = note.title
+            ).executeAsList()
 
-        links.map { link ->
-            val sourceNote = database.noolIndexQueries.getNote(link.sourcePath).executeAsOneOrNull()
-            val sourceTitle = sourceNote?.title ?: link.sourcePath.substringAfterLast('/').removeSuffix(".md")
-            val snippet = sourceNote?.content?.let { extractSurroundingSnippet(it, link.targetTitle) } ?: ""
-            BacklinkItem(
-                sourcePath = link.sourcePath,
-                sourceTitle = sourceTitle,
-                snippet = snippet,
-                alias = link.alias,
-                isEmbed = link.isEmbed
-            )
-        }
+            links.map { link ->
+                val sourceNote = database.noolIndexQueries.getNote(link.sourcePath).executeAsOneOrNull()
+                val sourceTitle = sourceNote?.title ?: link.sourcePath.substringAfterLast('/').removeSuffix(".md")
+                val snippet = sourceNote?.content?.let { extractSurroundingSnippet(it, link.targetTitle) } ?: ""
+                BacklinkItem(
+                    sourcePath = link.sourcePath,
+                    sourceTitle = sourceTitle,
+                    snippet = snippet,
+                    alias = link.alias,
+                    isEmbed = link.isEmbed
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun getUnlinkedMentions(targetRelativePath: String): List<UnlinkedMentionItem> = withContext(ioDispatcher) {
-        val clean = targetRelativePath.trim().removePrefix("/").replace('\\', '/')
-        val note = database.noolIndexQueries.getNote(clean).executeAsOneOrNull() ?: return@withContext emptyList()
-        val allNotes = database.noolIndexQueries.getAllNotes().executeAsList()
+        runCatching {
+            val clean = targetRelativePath.trim().removePrefix("/").replace('\\', '/')
+            val note = database.noolIndexQueries.getNote(clean).executeAsOneOrNull() ?: return@runCatching emptyList()
+            val allNotes = database.noolIndexQueries.getAllNotes().executeAsList()
 
-        val candidateTerms = mutableListOf(note.title)
-        if (note.aliases.isNotBlank()) {
-            val aliasList = note.aliases.split(",").map { it.trim() }.filter { it.length >= 2 }
-            candidateTerms.addAll(aliasList)
-        }
+            val candidateTerms = mutableListOf(note.title)
+            if (note.aliases.isNotBlank()) {
+                val aliasList = note.aliases.split(",").map { it.trim() }.filter { it.length >= 2 }
+                candidateTerms.addAll(aliasList)
+            }
 
-        val referencingPaths = database.noolIndexQueries.getReferencingSourcePaths(
-            targetTitle = note.title,
-            resolvedPath = note.relativePath
-        ).executeAsList().toSet()
+            val referencingPaths = database.noolIndexQueries.getReferencingSourcePaths(
+                targetTitle = note.title,
+                resolvedPath = note.relativePath
+            ).executeAsList().toSet()
 
-        val results = mutableListOf<UnlinkedMentionItem>()
+            val results = mutableListOf<UnlinkedMentionItem>()
 
-        for (candidateNote in allNotes) {
-            if (candidateNote.relativePath == note.relativePath) continue
-            if (referencingPaths.contains(candidateNote.relativePath)) continue
+            for (candidateNote in allNotes) {
+                if (candidateNote.relativePath == note.relativePath) continue
+                if (referencingPaths.contains(candidateNote.relativePath)) continue
 
-            for (term in candidateTerms) {
-                val termRegex = Regex("""(?<!\[\[)\b${Regex.escape(term)}\b(?!\]\])""", RegexOption.IGNORE_CASE)
-                if (termRegex.containsMatchIn(candidateNote.content)) {
-                    val snippet = extractSurroundingSnippet(candidateNote.content, term)
-                    results.add(
-                        UnlinkedMentionItem(
-                            sourcePath = candidateNote.relativePath,
-                            sourceTitle = candidateNote.title,
-                            matchedText = term,
-                            snippet = snippet
+                for (term in candidateTerms) {
+                    val termRegex = Regex("""(?<!\[\[)\b${Regex.escape(term)}\b(?!\]\])""", RegexOption.IGNORE_CASE)
+                    if (termRegex.containsMatchIn(candidateNote.content)) {
+                        val snippet = extractSurroundingSnippet(candidateNote.content, term)
+                        results.add(
+                            UnlinkedMentionItem(
+                                sourcePath = candidateNote.relativePath,
+                                sourceTitle = candidateNote.title,
+                                matchedText = term,
+                                snippet = snippet
+                            )
                         )
-                    )
-                    break
+                        break
+                    }
                 }
             }
-        }
-        results
+            results
+        }.getOrDefault(emptyList())
     }
 
     suspend fun search(
@@ -233,87 +243,91 @@ class SqlDelightIndexManager(
     }
 
     suspend fun getAllTagsWithCounts(): Map<String, Int> = withContext(ioDispatcher) {
-        val rawTags = database.noolIndexQueries.getAllTagsRaw().executeAsList()
-        val countMap = mutableMapOf<String, Int>()
-        for (row in rawTags) {
-            val tags = row.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
-            for (tag in tags) {
-                countMap[tag] = (countMap[tag] ?: 0) + 1
+        runCatching {
+            val rawTags = database.noolIndexQueries.getAllTagsRaw().executeAsList()
+            val countMap = mutableMapOf<String, Int>()
+            for (row in rawTags) {
+                val tags = row.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+                for (tag in tags) {
+                    countMap[tag] = (countMap[tag] ?: 0) + 1
+                }
             }
-        }
-        countMap.toSortedMap()
+            countMap.toSortedMap()
+        }.getOrDefault(emptyMap())
     }
 
     suspend fun getGraphData(
         localNotePath: String? = null,
         localDepth: Int = 1
     ): GraphData = withContext(ioDispatcher) {
-        val notes = database.noolIndexQueries.getAllNotes().executeAsList()
-        val rawLinks = database.noolIndexQueries.getAllLinks().executeAsList()
+        runCatching {
+            val notes = database.noolIndexQueries.getAllNotes().executeAsList()
+            val rawLinks = database.noolIndexQueries.getAllLinks().executeAsList()
 
-        val allEdges = rawLinks.map { link ->
-            GraphEdge(
-                source = link.sourcePath,
-                target = link.resolvedPath ?: link.targetTitle,
-                isEmbed = link.isEmbed,
-                isResolved = link.resolvedPath != null
-            )
-        }
+            val allEdges = rawLinks.map { link ->
+                GraphEdge(
+                    source = link.sourcePath,
+                    target = link.resolvedPath ?: link.targetTitle,
+                    isEmbed = link.isEmbed,
+                    isResolved = link.resolvedPath != null
+                )
+            }
 
-        val keptNodeIds: Set<String> = if (!localNotePath.isNullOrBlank()) {
-            val cleanLocal = localNotePath.trim().removePrefix("/").replace('\\', '/')
-            val visited = mutableSetOf(cleanLocal)
-            var currentLayer = setOf(cleanLocal)
-            val maxDepth = localDepth.coerceIn(1, 3)
+            val keptNodeIds: Set<String> = if (!localNotePath.isNullOrBlank()) {
+                val cleanLocal = localNotePath.trim().removePrefix("/").replace('\\', '/')
+                val visited = mutableSetOf(cleanLocal)
+                var currentLayer = setOf(cleanLocal)
+                val maxDepth = localDepth.coerceIn(1, 3)
 
-            for (depth in 1..maxDepth) {
-                val nextLayer = mutableSetOf<String>()
-                for (edge in allEdges) {
-                    if (edge.source in currentLayer && edge.isResolved && edge.target !in visited) {
-                        nextLayer.add(edge.target)
+                for (depth in 1..maxDepth) {
+                    val nextLayer = mutableSetOf<String>()
+                    for (edge in allEdges) {
+                        if (edge.source in currentLayer && edge.isResolved && edge.target !in visited) {
+                            nextLayer.add(edge.target)
+                        }
+                        if (edge.target in currentLayer && edge.source !in visited) {
+                            nextLayer.add(edge.source)
+                        }
                     }
-                    if (edge.target in currentLayer && edge.source !in visited) {
-                        nextLayer.add(edge.source)
-                    }
+                    visited.addAll(nextLayer)
+                    currentLayer = nextLayer
+                    if (currentLayer.isEmpty()) break
                 }
-                visited.addAll(nextLayer)
-                currentLayer = nextLayer
-                if (currentLayer.isEmpty()) break
+                visited
+            } else {
+                notes.map { it.relativePath }.toSet()
             }
-            visited
-        } else {
-            notes.map { it.relativePath }.toSet()
-        }
 
-        val filteredEdges = allEdges.filter { edge ->
-            edge.source in keptNodeIds && (edge.target in keptNodeIds || !edge.isResolved)
-        }
-
-        val degreeMap = mutableMapOf<String, Int>()
-        for (edge in filteredEdges) {
-            degreeMap[edge.source] = (degreeMap[edge.source] ?: 0) + 1
-            if (edge.isResolved) {
-                degreeMap[edge.target] = (degreeMap[edge.target] ?: 0) + 1
+            val filteredEdges = allEdges.filter { edge ->
+                edge.source in keptNodeIds && (edge.target in keptNodeIds || !edge.isResolved)
             }
-        }
 
-        val graphNodes = notes.filter { it.relativePath in keptNodeIds }.map { entity ->
-            GraphNode(
-                id = entity.relativePath,
-                label = entity.title,
-                folder = entity.folderPath,
-                tags = entity.tags.split(",").map { it.trim() }.filter { it.isNotBlank() },
-                noteType = entity.noteType,
-                isPinned = entity.isPinned,
-                isFavorite = entity.isFavorite,
-                degree = degreeMap[entity.relativePath] ?: 0
+            val degreeMap = mutableMapOf<String, Int>()
+            for (edge in filteredEdges) {
+                degreeMap[edge.source] = (degreeMap[edge.source] ?: 0) + 1
+                if (edge.isResolved) {
+                    degreeMap[edge.target] = (degreeMap[edge.target] ?: 0) + 1
+                }
+            }
+
+            val graphNodes = notes.filter { it.relativePath in keptNodeIds }.map { entity ->
+                GraphNode(
+                    id = entity.relativePath,
+                    label = entity.title,
+                    folder = entity.folderPath,
+                    tags = entity.tags.split(",").map { it.trim() }.filter { it.isNotBlank() },
+                    noteType = entity.noteType,
+                    isPinned = entity.isPinned,
+                    isFavorite = entity.isFavorite,
+                    degree = degreeMap[entity.relativePath] ?: 0
+                )
+            }
+
+            GraphData(
+                nodes = graphNodes,
+                edges = filteredEdges
             )
-        }
-
-        GraphData(
-            nodes = graphNodes,
-            edges = filteredEdges
-        )
+        }.getOrDefault(GraphData(emptyList(), emptyList()))
     }
 
     suspend fun upsertCalendarEvent(event: CalendarEvent): Unit = withContext(ioDispatcher) {

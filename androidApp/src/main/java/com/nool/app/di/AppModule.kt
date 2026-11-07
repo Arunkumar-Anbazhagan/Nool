@@ -37,6 +37,42 @@ val appModule = module {
         val callback = object : AndroidSqliteDriver.Callback(schema) {
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
+                // Self-healing: Ensure all core tables and indices exist
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS notes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        relativePath TEXT NOT NULL UNIQUE,
+                        title TEXT NOT NULL,
+                        folderPath TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        excerpt TEXT NOT NULL,
+                        lastModified INTEGER NOT NULL,
+                        createdTimestamp INTEGER NOT NULL,
+                        size INTEGER NOT NULL,
+                        isPinned INTEGER NOT NULL DEFAULT 0,
+                        isFavorite INTEGER NOT NULL DEFAULT 0,
+                        isArchived INTEGER NOT NULL DEFAULT 0,
+                        tags TEXT NOT NULL DEFAULT '',
+                        aliases TEXT NOT NULL DEFAULT '',
+                        noteType TEXT NOT NULL DEFAULT 'Note'
+                    );
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS links (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        sourcePath TEXT NOT NULL,
+                        rawTarget TEXT NOT NULL,
+                        targetTitle TEXT NOT NULL,
+                        targetHeading TEXT,
+                        alias TEXT,
+                        isEmbed INTEGER NOT NULL DEFAULT 0,
+                        resolvedPath TEXT
+                    );
+                    """.trimIndent()
+                )
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS calendar_events (
@@ -56,14 +92,65 @@ val appModule = module {
                     );
                     """.trimIndent()
                 )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folderPath);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notes_last_modified ON notes(lastModified);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_source ON links(sourcePath);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_target ON links(targetTitle);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_resolved ON links(resolvedPath);")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_start_end ON calendar_events(startTime, endTime);")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_calendar ON calendar_events(calendarId);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_note ON calendar_events(linkedNotePath);")
+
+                try {
+                    db.execSQL(
+                        """
+                        CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(
+                            title,
+                            content,
+                            tags,
+                            folderPath,
+                            content='notes',
+                            content_rowid='id',
+                            prefix='2 3',
+                            tokenize='unicode61'
+                        );
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+                            INSERT INTO note_fts(rowid, title, content, tags, folderPath)
+                            VALUES (new.id, new.title, new.content, new.tags, new.folderPath);
+                        END;
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+                            INSERT INTO note_fts(note_fts, rowid, title, content, tags, folderPath)
+                            VALUES ('delete', old.id, old.title, old.content, old.tags, old.folderPath);
+                        END;
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+                            INSERT INTO note_fts(note_fts, rowid, title, content, tags, folderPath)
+                            VALUES ('delete', old.id, old.title, old.content, old.tags, old.folderPath);
+                            INSERT INTO note_fts(rowid, title, content, tags, folderPath)
+                            VALUES (new.id, new.title, new.content, new.tags, new.folderPath);
+                        END;
+                        """.trimIndent()
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
         val driver = AndroidSqliteDriver(
             schema = schema,
             context = androidContext(),
-            name = "nool_index_v4.db",
+            name = "nool_index_v5.db",
             callback = callback
         )
         NoolDatabase(driver)
