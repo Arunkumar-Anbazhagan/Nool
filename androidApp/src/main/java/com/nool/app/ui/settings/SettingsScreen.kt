@@ -1,7 +1,6 @@
 package com.nool.app.ui.settings
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -90,7 +89,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -166,7 +164,7 @@ fun SettingsScreen(
             "About"
         )
     }
-    var expandedGroups by rememberSaveable { mutableStateOf(allGroupTitles.toSet()) }
+    var expandedGroups by remember { mutableStateOf(allGroupTitles.toSet()) }
 
     fun toggleGroup(title: String) {
         expandedGroups = if (expandedGroups.contains(title)) {
@@ -1088,7 +1086,6 @@ private fun SettingsGroupCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(Dimens.CardPadding)
-                .animateContentSize()
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
