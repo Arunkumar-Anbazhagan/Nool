@@ -195,7 +195,7 @@ fun SearchScreen(
                     FilterChip(
                         selected = true,
                         onClick = { viewModel.selectFolder(null) },
-                        label = { Text(if (uiState.selectedFolder.isNullOrEmpty()) "/" else uiState.selectedFolder!!) },
+                        label = { Text(uiState.selectedFolder?.ifEmpty { "/" } ?: "/") },
                         trailingIcon = { Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(14.dp)) }
                     )
                 }

@@ -235,8 +235,10 @@ fun GitSettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = {
-                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                        context.startActivity(intent)
+                        runCatching {
+                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            context.startActivity(intent)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {

@@ -37,6 +37,7 @@ class SettingsRepositoryTest {
         val repo = createRepository()
 
         assertEquals(ThemeMode.SYSTEM, repo.themeMode.first())
+        assertEquals(com.nool.app.settings.ThemePalette.DEFAULT, repo.themePalette.first())
         assertTrue(repo.dynamicColor.first())
         assertFalse(repo.pureBlack.first())
         assertEquals(16, repo.fontSize.first())
@@ -63,6 +64,9 @@ class SettingsRepositoryTest {
 
         repo.setDynamicColor(false)
         assertFalse(repo.dynamicColor.first())
+
+        repo.setThemePalette(com.nool.app.settings.ThemePalette.EMERALD)
+        assertEquals(com.nool.app.settings.ThemePalette.EMERALD, repo.themePalette.first())
 
         repo.setFontSize(20)
         assertEquals(20, repo.fontSize.first())

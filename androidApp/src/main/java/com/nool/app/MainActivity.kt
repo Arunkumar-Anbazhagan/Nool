@@ -96,6 +96,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             val themeMode by settingsRepository.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val dynamicColor by settingsRepository.dynamicColor.collectAsState(initial = true)
+            val themePalette by settingsRepository.themePalette.collectAsState(initial = com.nool.app.settings.ThemePalette.DEFAULT)
             val pureBlack by settingsRepository.pureBlack.collectAsState(initial = false)
             val biometricLockEnabled by settingsRepository.biometricLock.collectAsState(initial = false)
             val shareUiState by shareViewModel.uiState.collectAsState()
@@ -133,7 +134,8 @@ class MainActivity : FragmentActivity() {
             NoolTheme(
                 darkTheme = isDark,
                 dynamicColor = dynamicColor,
-                pureBlack = pureBlack
+                pureBlack = pureBlack,
+                palette = themePalette
             ) {
                 val navController = rememberNavController()
                 val pendingQuickNote by pendingQuickNoteState

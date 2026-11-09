@@ -517,7 +517,7 @@ private fun MonthGridView(
             for (row in 0 until 6) {
                 Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     for (col in 0 until 7) {
-                        val info = daysInMonth[row * 7 + col]
+                        val info = daysInMonth.getOrNull(row * 7 + col) ?: continue
                         MonthDayCell(
                             dayInfo = info,
                             onClick = { onDayClick(info.dateMillis) },
@@ -758,7 +758,9 @@ private fun WeekTimelineView(
                             .pointerInput(dayMillis) {
                                 detectTapGestures(
                                     onLongPress = { offset ->
-                                        val clickedMinute = offset.y.toInt()
+                                        val clickedMinute = if (size.height > 0) {
+                                            (offset.y / size.height.toFloat() * 1440f).toInt().coerceIn(0, 1439)
+                                        } else 0
                                         val slotMillis = dayStart + (clickedMinute * 60_000L)
                                         onTimeSlotLongClick(slotMillis)
                                     }
@@ -891,7 +893,9 @@ private fun DayTimelineView(
                 .pointerInput(startOfDay) {
                     detectTapGestures(
                         onLongPress = { offset ->
-                            val clickedMinute = offset.y.toInt()
+                            val clickedMinute = if (size.height > 0) {
+                                (offset.y / size.height.toFloat() * 1440f).toInt().coerceIn(0, 1439)
+                            } else 0
                             val slotMillis = startOfDay + (clickedMinute * 60_000L)
                             onTimeSlotLongClick(slotMillis)
                         }

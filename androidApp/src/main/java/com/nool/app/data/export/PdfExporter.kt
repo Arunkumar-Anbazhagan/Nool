@@ -156,6 +156,6 @@ object PdfExporter {
         }
         val chooser = Intent.createChooser(shareIntent, "Share PDF Note")
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(chooser)
+        runCatching { context.startActivity(chooser) }
     }
 }

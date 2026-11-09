@@ -905,8 +905,7 @@ fun NoteDetailScreen(
         }
     }
 
-    if (confirmRestoreCommit != null) {
-        val commitToRestore = confirmRestoreCommit!!
+    confirmRestoreCommit?.let { commitToRestore ->
         AlertDialog(
             onDismissRequest = { confirmRestoreCommit = null },
             icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -934,15 +933,16 @@ fun NoteDetailScreen(
         )
     }
 
-    if (uiState.previewCommit != null && uiState.previewCommitContent != null) {
-        val commit = uiState.previewCommit!!
+    val previewCommit = uiState.previewCommit
+    val previewCommitContent = uiState.previewCommitContent
+    if (previewCommit != null && previewCommitContent != null) {
         AlertDialog(
             onDismissRequest = { viewModel.closeCommitPreview() },
-            title = { Text("Revision ${commit.shortHash}") },
+            title = { Text("Revision ${previewCommit.shortHash}") },
             text = {
                 Column {
                     Text(
-                        text = commit.message,
+                        text = previewCommit.message,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -956,7 +956,7 @@ fun NoteDetailScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = uiState.previewCommitContent!!,
+                            text = previewCommitContent,
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -966,7 +966,7 @@ fun NoteDetailScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.restoreVersion(commit)
+                        viewModel.restoreVersion(previewCommit)
                     }
                 ) {
                     Text("Restore this revision")

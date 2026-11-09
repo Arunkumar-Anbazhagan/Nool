@@ -127,9 +127,10 @@ fun MermaidDiagramCard(
         }
     }
 
-    if (showFullscreen && renderedSvg != null) {
+    val currentSvg = renderedSvg
+    if (showFullscreen && currentSvg != null) {
         MermaidFullscreenDialog(
-            svg = renderedSvg!!,
+            svg = currentSvg,
             onDismiss = { showFullscreen = false }
         )
     }

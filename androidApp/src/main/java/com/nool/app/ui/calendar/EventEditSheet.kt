@@ -456,8 +456,8 @@ fun EventEditSheet(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (onOpenNote != null) {
-                                IconButton(onClick = { onOpenNote(linkedNotePath!!) }) {
+                            if (onOpenNote != null && linkedNotePath != null) {
+                                IconButton(onClick = { linkedNotePath?.let { onOpenNote(it) } }) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.OpenInNew,
                                         contentDescription = "Open Note",

@@ -1243,8 +1243,12 @@ private fun handleLinkClick(
         if (onLinkClick != null) {
             onLinkClick(url)
         } else if (url.startsWith("http://") || url.startsWith("https://")) {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
+            runCatching {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
         }
     }
 }

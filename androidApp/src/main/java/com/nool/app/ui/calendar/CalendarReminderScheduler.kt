@@ -117,7 +117,11 @@ class CalendarReminderWorker(
             .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify(eventId.hashCode(), notification)
+        try {
+            notificationManager.notify(eventId.hashCode(), notification)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         return Result.success()
     }

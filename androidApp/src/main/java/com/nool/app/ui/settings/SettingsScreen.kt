@@ -1,6 +1,10 @@
 package com.nool.app.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.nool.app.settings.ThemePalette
+import com.nool.app.ui.theme.previewColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
@@ -96,6 +105,7 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
+    val themePalette by viewModel.themePalette.collectAsState()
     val pureBlack by viewModel.pureBlack.collectAsState()
     val fontSize by viewModel.fontSize.collectAsState()
     val noteLayoutMode by viewModel.noteLayoutMode.collectAsState()
@@ -229,6 +239,103 @@ fun SettingsScreen(
                         },
                         onClick = { viewModel.setDynamicColor(!dynamicColor) }
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
+                    // Accent Palette Selector
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.Spacing16, vertical = Dimens.Spacing12)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(Dimens.Spacing16))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Color Palette",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(Dimens.Spacing4))
+                                Text(
+                                    text = if (dynamicColor) {
+                                        "Material You active (select a palette to customize)"
+                                    } else {
+                                        "Active: ${themePalette.label}"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(Dimens.Spacing12))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing12)
+                        ) {
+                            val isDark = when (themeMode) {
+                                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                                ThemeMode.DARK -> true
+                                ThemeMode.LIGHT -> false
+                            }
+                            ThemePalette.entries.forEach { palette ->
+                                val isSelected = !dynamicColor && themePalette == palette
+                                val swatchColor = palette.previewColor(isDark)
+
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(Dimens.CornerMedium))
+                                        .clickable {
+                                            viewModel.setDynamicColor(false)
+                                            viewModel.setThemePalette(palette)
+                                        }
+                                        .padding(Dimens.Spacing4)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(swatchColor)
+                                            .then(
+                                                if (isSelected) {
+                                                    Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                                } else {
+                                                    Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                                }
+                                            )
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(Dimens.Spacing4))
+                                    Text(
+                                        text = palette.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 
                     // Pure Black (AMOLED)

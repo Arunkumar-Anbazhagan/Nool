@@ -118,6 +118,7 @@ fun NoolTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     pureBlack: Boolean = false,
+    palette: com.nool.app.settings.ThemePalette = com.nool.app.settings.ThemePalette.DEFAULT,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -126,8 +127,7 @@ fun NoolTheme(
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> getPaletteColorScheme(palette, darkTheme)
     }
 
     val finalColorScheme = if (darkTheme && pureBlack) {

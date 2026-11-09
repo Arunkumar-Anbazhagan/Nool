@@ -40,6 +40,9 @@ class SettingsViewModel(
     val dynamicColor: StateFlow<Boolean> = settingsRepository.dynamicColor
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val themePalette: StateFlow<com.nool.app.settings.ThemePalette> = settingsRepository.themePalette
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.nool.app.settings.ThemePalette.DEFAULT)
+
     val pureBlack: StateFlow<Boolean> = settingsRepository.pureBlack
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -116,6 +119,16 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 settingsRepository.setDynamicColor(enabled)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun setThemePalette(palette: com.nool.app.settings.ThemePalette) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.setThemePalette(palette)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

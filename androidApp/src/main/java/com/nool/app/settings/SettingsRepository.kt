@@ -22,6 +22,16 @@ enum class ThemeMode {
     DARK
 }
 
+enum class ThemePalette(val label: String) {
+    DEFAULT("Indigo"),
+    EMERALD("Emerald"),
+    ROSE("Rose"),
+    AMBER("Amber"),
+    OBSIDIAN("Obsidian"),
+    NORD("Nord"),
+    OCEAN("Ocean")
+}
+
 enum class NoteLayoutMode(val label: String) {
     LIST("List"),
     GRID("Grid")
@@ -72,6 +82,7 @@ class SettingsRepository(
         private val KEY_CALENDAR_FIRST_DAY = intPreferencesKey("calendar_first_day")
         private val KEY_CALENDAR_DEFAULT_REMINDER = intPreferencesKey("calendar_default_reminder")
         private val KEY_CALENDAR_DEFAULT_CALENDAR = stringPreferencesKey("calendar_default_calendar")
+        private val KEY_THEME_PALETTE = stringPreferencesKey("theme_palette")
     }
 
     private val safePrefsFlow: Flow<Preferences> = dataStore?.data?.catch { exception ->
@@ -89,6 +100,11 @@ class SettingsRepository(
 
     val dynamicColor: Flow<Boolean> = safePrefsFlow.map { prefs ->
         prefs[KEY_DYNAMIC_COLOR] ?: true
+    }
+
+    val themePalette: Flow<ThemePalette> = safePrefsFlow.map { prefs ->
+        val raw = prefs[KEY_THEME_PALETTE] ?: ThemePalette.DEFAULT.name
+        try { ThemePalette.valueOf(raw) } catch (e: Exception) { ThemePalette.DEFAULT }
     }
 
     val fontSize: Flow<Int> = safePrefsFlow.map { prefs ->
@@ -218,6 +234,10 @@ class SettingsRepository(
 
     suspend fun setDynamicColor(enabled: Boolean) {
         runCatching { dataStore?.edit { it[KEY_DYNAMIC_COLOR] = enabled } }
+    }
+
+    suspend fun setThemePalette(palette: ThemePalette) {
+        runCatching { dataStore?.edit { it[KEY_THEME_PALETTE] = palette.name } }
     }
 
     suspend fun setFontSize(size: Int) {

@@ -163,7 +163,7 @@ fun NoolNavGraph(
             )
         ) { backStackEntry ->
             val notePath = backStackEntry.arguments?.getString("notePath") ?: ""
-            val decodedNotePath = if (notePath.isNotBlank()) URLDecoder.decode(notePath, StandardCharsets.UTF_8.toString()).ifEmpty { null } else null
+            val decodedNotePath = if (notePath.isNotBlank()) Screen.NoteDetail.decodePath(notePath).ifEmpty { null } else null
             val viewModel: GraphViewModel = koinViewModel(
                 parameters = { parametersOf(decodedNotePath) }
             )
