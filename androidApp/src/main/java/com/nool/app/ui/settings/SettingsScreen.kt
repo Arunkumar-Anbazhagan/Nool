@@ -1,5 +1,12 @@
 package com.nool.app.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +15,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import com.nool.app.settings.ThemePalette
 import com.nool.app.ui.theme.previewColor
@@ -40,6 +49,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -49,6 +59,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -78,6 +90,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,6 +154,27 @@ fun SettingsScreen(
     var tempTemplatesText by remember { mutableStateOf("") }
     var tempDailyNotesText by remember { mutableStateOf("") }
     var tempFontSize by remember { mutableFloatStateOf(fontSize.toFloat()) }
+
+    val allGroupTitles = remember {
+        listOf(
+            "Appearance",
+            "Notes & Editor",
+            "Calendar",
+            "Sync & Backup",
+            "Security & Privacy",
+            "Storage",
+            "About"
+        )
+    }
+    var expandedGroups by rememberSaveable { mutableStateOf(allGroupTitles.toSet()) }
+
+    fun toggleGroup(title: String) {
+        expandedGroups = if (expandedGroups.contains(title)) {
+            expandedGroups - title
+        } else {
+            expandedGroups + title
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -210,9 +244,47 @@ fun SettingsScreen(
                 shape = MaterialTheme.shapes.medium
             )
 
+            // Expand / Collapse all controller row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.Spacing4),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (searchQuery.isNotBlank()) "Search filter active" else "${expandedGroups.size} of ${allGroupTitles.size} sections expanded",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(
+                    onClick = {
+                        expandedGroups = if (expandedGroups.isEmpty()) allGroupTitles.toSet() else emptySet()
+                    },
+                    contentPadding = PaddingValues(horizontal = Dimens.Spacing8, vertical = Dimens.Spacing4)
+                ) {
+                    Icon(
+                        imageVector = if (expandedGroups.isEmpty()) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(Dimens.Spacing4))
+                    Text(
+                        text = if (expandedGroups.isEmpty()) "Expand all" else "Collapse all",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
             // 1. APPEARANCE
             if (matchesSearch("Appearance Theme Dark Light Mode Dynamic Color Font Size Note Layout Pure Black", searchQuery)) {
-                SettingsGroupCard(title = "Appearance", icon = Icons.Default.Palette) {
+                SettingsGroupCard(
+                    title = "Appearance",
+                    icon = Icons.Default.Palette,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Appearance"),
+                    onToggleExpand = { toggleGroup("Appearance") }
+                ) {
                     // Theme Mode
                     SettingsRowItem(
                         icon = Icons.Default.DarkMode,
@@ -377,7 +449,12 @@ fun SettingsScreen(
 
             // 2. NOTES & EDITOR
             if (matchesSearch("Notes Editor Templates Folder Daily Markdown Auto-Save", searchQuery)) {
-                SettingsGroupCard(title = "Notes & Editor", icon = Icons.Outlined.Description) {
+                SettingsGroupCard(
+                    title = "Notes & Editor",
+                    icon = Icons.Outlined.Description,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Notes & Editor"),
+                    onToggleExpand = { toggleGroup("Notes & Editor") }
+                ) {
                     // Templates Folder
                     SettingsRowItem(
                         icon = Icons.Default.Folder,
@@ -420,7 +497,12 @@ fun SettingsScreen(
 
             // 3. CALENDAR
             if (matchesSearch("Calendar Default View First Day Week Reminder Schedule", searchQuery)) {
-                SettingsGroupCard(title = "Calendar", icon = Icons.Default.CalendarMonth) {
+                SettingsGroupCard(
+                    title = "Calendar",
+                    icon = Icons.Default.CalendarMonth,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Calendar"),
+                    onToggleExpand = { toggleGroup("Calendar") }
+                ) {
                     // Default View
                     SettingsRowItem(
                         icon = Icons.Default.CalendarMonth,
@@ -451,7 +533,12 @@ fun SettingsScreen(
 
             // 4. SYNC & BACKUP
             if (matchesSearch("Sync Backup Git Repository Remote Status Clone", searchQuery)) {
-                SettingsGroupCard(title = "Sync & Backup", icon = Icons.Default.Sync) {
+                SettingsGroupCard(
+                    title = "Sync & Backup",
+                    icon = Icons.Default.Sync,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Sync & Backup"),
+                    onToggleExpand = { toggleGroup("Sync & Backup") }
+                ) {
                     SettingsRowItem(
                         icon = Icons.Default.Sync,
                         title = "Git Repository Status",
@@ -471,7 +558,12 @@ fun SettingsScreen(
 
             // 5. SECURITY & PRIVACY
             if (matchesSearch("Security Privacy Biometric Lock Fingerprint Passcode", searchQuery)) {
-                SettingsGroupCard(title = "Security & Privacy", icon = Icons.Default.Lock) {
+                SettingsGroupCard(
+                    title = "Security & Privacy",
+                    icon = Icons.Default.Lock,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Security & Privacy"),
+                    onToggleExpand = { toggleGroup("Security & Privacy") }
+                ) {
                     SettingsRowItem(
                         icon = Icons.Default.Fingerprint,
                         title = "Biometric App Lock",
@@ -497,7 +589,12 @@ fun SettingsScreen(
 
             // 6. STORAGE & INDEX
             if (matchesSearch("Storage Usage Notes Count Cache Rebuild Index Size", searchQuery)) {
-                SettingsGroupCard(title = "Storage", icon = Icons.Default.Storage) {
+                SettingsGroupCard(
+                    title = "Storage",
+                    icon = Icons.Default.Storage,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Storage"),
+                    onToggleExpand = { toggleGroup("Storage") }
+                ) {
                     SettingsRowItem(
                         icon = Icons.Default.Storage,
                         title = "Vault Usage",
@@ -529,7 +626,12 @@ fun SettingsScreen(
 
             // 7. ABOUT
             if (matchesSearch("About Version Licenses Nool Open Source", searchQuery)) {
-                SettingsGroupCard(title = "About", icon = Icons.Default.Info) {
+                SettingsGroupCard(
+                    title = "About",
+                    icon = Icons.Default.Info,
+                    isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("About"),
+                    onToggleExpand = { toggleGroup("About") }
+                ) {
                     SettingsRowItem(
                         icon = Icons.Default.Info,
                         title = "Version",
@@ -967,18 +1069,34 @@ fun SettingsScreen(
 private fun SettingsGroupCard(
     title: String,
     icon: ImageVector,
+    isExpanded: Boolean = true,
+    onToggleExpand: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
+    val rotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        label = "chevronRotation"
+    )
+
     Card(
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = Dimens.ElevationLow),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(Dimens.CardPadding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimens.CardPadding)
+                .animateContentSize()
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = Dimens.Spacing12)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onToggleExpand)
+                    .padding(vertical = Dimens.Spacing4)
             ) {
                 Surface(
                     shape = RoundedCornerShape(Dimens.CornerSmall),
@@ -999,10 +1117,31 @@ private fun SettingsGroupCard(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Collapse $title" else "Expand $title",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.rotate(rotation)
+                    )
+                }
             }
-            content()
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(modifier = Modifier.padding(top = Dimens.Spacing8)) {
+                    content()
+                }
+            }
         }
     }
 }

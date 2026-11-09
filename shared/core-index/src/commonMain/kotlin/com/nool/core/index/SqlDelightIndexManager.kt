@@ -347,24 +347,32 @@ class SqlDelightIndexManager(
                 createdTimestamp = event.createdTimestamp,
                 lastModified = event.lastModified
             )
+        }.onFailure {
+            it.printStackTrace()
         }
     }
 
     suspend fun deleteCalendarEvent(id: String): Unit = withContext(ioDispatcher) {
         runCatching {
             database.noolIndexQueries.deleteCalendarEvent(id)
+        }.onFailure {
+            it.printStackTrace()
         }
     }
 
     suspend fun getCalendarEvent(id: String): CalendarEvent? = withContext(ioDispatcher) {
         runCatching {
             database.noolIndexQueries.getCalendarEvent(id).executeAsOneOrNull()?.toCalendarEvent()
+        }.onFailure {
+            it.printStackTrace()
         }.getOrNull()
     }
 
     suspend fun getAllCalendarEvents(): List<CalendarEvent> = withContext(ioDispatcher) {
         runCatching {
             database.noolIndexQueries.getAllCalendarEvents().executeAsList().map { it.toCalendarEvent() }
+        }.onFailure {
+            it.printStackTrace()
         }.getOrDefault(emptyList())
     }
 
@@ -374,12 +382,16 @@ class SqlDelightIndexManager(
             rawEvents.flatMap { event ->
                 RruleExpander.expand(event, rangeStart, rangeEnd)
             }.sortedBy { it.instanceStartTime }
+        }.onFailure {
+            it.printStackTrace()
         }.getOrDefault(emptyList())
     }
 
     suspend fun getEventsForNote(notePath: String): List<CalendarEvent> = withContext(ioDispatcher) {
         runCatching {
             database.noolIndexQueries.getEventsForNote(notePath).executeAsList().map { it.toCalendarEvent() }
+        }.onFailure {
+            it.printStackTrace()
         }.getOrDefault(emptyList())
     }
 

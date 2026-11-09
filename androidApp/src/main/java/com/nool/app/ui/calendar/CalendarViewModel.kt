@@ -140,8 +140,9 @@ class CalendarViewModel(
 
     fun toggleCalendarFilter(calendarId: String) {
         _uiState.update { state ->
-            val updated = if (state.activeCalendars.contains(calendarId)) {
-                if (state.activeCalendars.size > 1) state.activeCalendars - calendarId else state.activeCalendars
+            val match = state.activeCalendars.firstOrNull { it.equals(calendarId, ignoreCase = true) }
+            val updated = if (match != null) {
+                if (state.activeCalendars.size > 1) state.activeCalendars - match else state.activeCalendars
             } else {
                 state.activeCalendars + calendarId
             }
@@ -159,6 +160,8 @@ class CalendarViewModel(
                         CalendarReminderScheduler.scheduleReminder(context, event)
                     }
                 }
+                // Automatically move selectedDate to the saved event's start date
+                _uiState.update { it.copy(selectedDate = event.startTime) }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -217,9 +220,12 @@ class CalendarViewModel(
             val instances = withContext(Dispatchers.IO) {
                 indexManager.getCalendarEventsInRange(startRange, endRange)
             }
-            val filtered = instances.filter { _uiState.value.activeCalendars.contains(it.event.calendarId) }
+            val active = _uiState.value.activeCalendars
+            val filtered = instances.filter {
+                active.isEmpty() || it.event.calendarId.isBlank() || active.any { c -> c.equals(it.event.calendarId, ignoreCase = true) }
+            }
             _uiState.update { it.copy(events = filtered) }
-            updateSelectedDayEvents(_uiState.value.selectedDate)
+            updateSelectedDayEvents(_uiState.value.selectedDate, filtered)
         } catch (e: Exception) {
             e.printStackTrace()
             _uiState.update { it.copy(events = emptyList(), selectedDayEvents = emptyList()) }
@@ -232,7 +238,7 @@ class CalendarViewModel(
         }
     }
 
-    private fun updateSelectedDayEvents(dateMillis: Long) {
+    private fun updateSelectedDayEvents(dateMillis: Long, currentEvents: List<CalendarEventInstance> = _uiState.value.events) {
         try {
             val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
             val startOfDay = Calendar.getInstance().apply {
@@ -242,7 +248,7 @@ class CalendarViewModel(
 
             val endOfDay = startOfDay + 86_400_000L - 1
 
-            val matching = _uiState.value.events.filter { instance ->
+            val matching = currentEvents.filter { instance ->
                 instance.instanceEndTime >= startOfDay && instance.instanceStartTime <= endOfDay
             }
             _uiState.update { it.copy(selectedDayEvents = matching) }
@@ -271,11 +277,11 @@ class CalendarViewModel(
         val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
         return when (mode) {
             CalendarViewMode.MONTH -> {
-                // Buffer by 2 weeks before and after for smooth swipe
+                // Buffer by 3 weeks before and after for smooth swipe and month boundaries
                 cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.add(Calendar.WEEK_OF_YEAR, -2)
+                cal.add(Calendar.WEEK_OF_YEAR, -3)
                 val start = cal.timeInMillis
-                cal.add(Calendar.WEEK_OF_YEAR, 8)
+                cal.add(Calendar.WEEK_OF_YEAR, 10)
                 val end = cal.timeInMillis
                 start to end
             }
@@ -283,24 +289,27 @@ class CalendarViewModel(
                 cal.set(Calendar.DAY_OF_WEEK, _uiState.value.firstDayOfWeek)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
                 cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 val start = cal.timeInMillis
-                cal.add(Calendar.DAY_OF_YEAR, 7)
+                cal.add(Calendar.DAY_OF_YEAR, 8)
                 val end = cal.timeInMillis
                 start to end
             }
             CalendarViewMode.DAY -> {
                 cal.set(Calendar.HOUR_OF_DAY, 0)
                 cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
                 val start = cal.timeInMillis
-                val end = start + 86_400_000L
+                val end = start + 86_400_000L - 1
                 start to end
             }
             CalendarViewMode.AGENDA -> {
-                // Upcoming 60 days
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
+                // Wide window: 1 year past to 2 years future so all upcoming & past events appear in agenda
+                cal.add(Calendar.YEAR, -1)
                 val start = cal.timeInMillis
-                cal.add(Calendar.DAY_OF_YEAR, 60)
+                cal.add(Calendar.YEAR, 3)
                 val end = cal.timeInMillis
                 start to end
             }

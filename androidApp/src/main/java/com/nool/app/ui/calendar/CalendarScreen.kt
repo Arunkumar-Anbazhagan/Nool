@@ -603,23 +603,43 @@ private fun MonthDayCell(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Event dots
+            // Event chips
             if (dayInfo.events.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.padding(top = 1.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 1.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
-                    dayInfo.events.take(3).forEach { ev ->
-                        val dotColor = try {
+                    dayInfo.events.take(2).forEach { ev ->
+                        val pillColor = try {
                             Color(android.graphics.Color.parseColor(ev.event.colorHex))
                         } catch (e: Exception) {
                             MaterialTheme.colorScheme.primary
                         }
                         Box(
                             modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(dotColor)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(Dimens.CornerXSmall))
+                                .background(pillColor.copy(alpha = 0.9f))
+                                .padding(horizontal = 2.dp, vertical = 0.5.dp)
+                        ) {
+                            Text(
+                                text = ev.event.title,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, lineHeight = 9.sp),
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    if (dayInfo.events.size > 2) {
+                        Text(
+                            text = "+${dayInfo.events.size - 2}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.sp),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                     }
                 }
@@ -691,6 +711,61 @@ private fun WeekTimelineView(
 
         HorizontalDivider()
 
+        // All Day Row (if any all day events in this week)
+        val allDayEventsByDay = remember(events, daysOfWeek) {
+            daysOfWeek.map { (dayMillis, _, _) ->
+                val dayStart = Calendar.getInstance().apply {
+                    timeInMillis = dayMillis
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val dayEnd = dayStart + 86_400_000L - 1
+                events.filter { it.event.isAllDay && it.instanceEndTime >= dayStart && it.instanceStartTime <= dayEnd }
+            }
+        }
+        val hasAnyAllDay = allDayEventsByDay.any { it.isNotEmpty() }
+        if (hasAnyAllDay) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, end = Dimens.Spacing8, top = Dimens.Spacing4, bottom = Dimens.Spacing4)
+            ) {
+                allDayEventsByDay.forEach { dayAllDayList ->
+                    Column(
+                        modifier = Modifier.weight(1f).padding(horizontal = 1.dp),
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                    ) {
+                        dayAllDayList.forEach { inst ->
+                            val color = try {
+                                Color(android.graphics.Color.parseColor(inst.event.colorHex))
+                            } catch (e: Exception) {
+                                MaterialTheme.colorScheme.primary
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(Dimens.CornerXSmall),
+                                color = color,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onEventClick(inst.event) }
+                            ) {
+                                Text(
+                                    text = inst.event.title,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+
         // 24 hour grid
         Box(
             modifier = Modifier
@@ -748,7 +823,7 @@ private fun WeekTimelineView(
                     }.timeInMillis
                     val dayEnd = dayStart + 86_400_000L - 1
 
-                    val dayEvents = events.filter { it.instanceEndTime >= dayStart && it.instanceStartTime <= dayEnd }
+                    val dayEvents = events.filter { !it.event.isAllDay && it.instanceEndTime >= dayStart && it.instanceStartTime <= dayEnd }
 
                     Box(
                         modifier = Modifier
@@ -830,79 +905,136 @@ private fun DayTimelineView(
         }.timeInMillis
     }
     val endOfDay = startOfDay + 86_400_000L - 1
-    val dayEvents = events.filter { it.instanceEndTime >= startOfDay && it.instanceStartTime <= endOfDay }
+    val allDayEvents = remember(events, startOfDay, endOfDay) {
+        events.filter { it.event.isAllDay && it.instanceEndTime >= startOfDay && it.instanceStartTime <= endOfDay }
+    }
+    val timedEvents = remember(events, startOfDay, endOfDay) {
+        events.filter { !it.event.isAllDay && it.instanceEndTime >= startOfDay && it.instanceStartTime <= endOfDay }
+    }
 
     LaunchedEffect(Unit) {
         val curHour = todayCal.get(Calendar.HOUR_OF_DAY)
         scrollState.scrollTo((curHour * 60).coerceAtLeast(0))
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = Dimens.Spacing8)
-    ) {
-        // Grid lines
-        Column {
-            for (hour in 0..23) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = String.format(Locale.getDefault(), "%02d:00", hour),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.width(56.dp).padding(top = 2.dp)
-                    )
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.weight(1f).padding(top = 10.dp)
-                    )
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (allDayEvents.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.Spacing16, vertical = Dimens.Spacing4),
+                verticalArrangement = Arrangement.spacedBy(Dimens.Spacing4)
+            ) {
+                allDayEvents.forEach { inst ->
+                    val eventColor = try {
+                        Color(android.graphics.Color.parseColor(inst.event.colorHex))
+                    } catch (e: Exception) {
+                        MaterialTheme.colorScheme.primary
+                    }
+                    Card(
+                        shape = MaterialTheme.shapes.small,
+                        colors = CardDefaults.cardColors(containerColor = eventColor.copy(alpha = 0.9f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onEventClick(inst.event) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = Dimens.Spacing12, vertical = Dimens.Spacing8),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(Dimens.CornerXSmall),
+                                color = Color.White.copy(alpha = 0.3f)
+                            ) {
+                                Text(
+                                    text = "All Day",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = Dimens.Spacing4, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(Dimens.Spacing8))
+                            Text(
+                                text = inst.event.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
+            HorizontalDivider()
         }
 
-        // Current time line
-        val isToday = selectedCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
-                selectedCal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = Dimens.Spacing8)
+        ) {
+            // Grid lines
+            Column {
+                for (hour in 0..23) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = String.format(Locale.getDefault(), "%02d:00", hour),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.width(56.dp).padding(top = 2.dp)
+                        )
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.weight(1f).padding(top = 10.dp)
+                        )
+                    }
+                }
+            }
 
-        if (isToday) {
-            val minutesIntoDay = todayCal.get(Calendar.HOUR_OF_DAY) * 60 + todayCal.get(Calendar.MINUTE)
-            val currentLineY = (minutesIntoDay * 1.0f).dp
+            // Current time line
+            val isToday = selectedCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    selectedCal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
 
+            if (isToday) {
+                val minutesIntoDay = todayCal.get(Calendar.HOUR_OF_DAY) * 60 + todayCal.get(Calendar.MINUTE)
+                val currentLineY = (minutesIntoDay * 1.0f).dp
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 56.dp)
+                        .offset(y = currentLineY)
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.error)
+                )
+            }
+
+            // Events on this day
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 56.dp)
-                    .offset(y = currentLineY)
-                    .height(2.dp)
-                    .background(MaterialTheme.colorScheme.error)
-            )
-        }
-
-        // Events on this day
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 60.dp)
-                .height(1440.dp)
-                .pointerInput(startOfDay) {
-                    detectTapGestures(
-                        onLongPress = { offset ->
-                            val clickedMinute = if (size.height > 0) {
-                                (offset.y / size.height.toFloat() * 1440f).toInt().coerceIn(0, 1439)
-                            } else 0
-                            val slotMillis = startOfDay + (clickedMinute * 60_000L)
-                            onTimeSlotLongClick(slotMillis)
-                        }
-                    )
-                }
-        ) {
-            dayEvents.forEach { inst ->
+                    .padding(start = 60.dp)
+                    .height(1440.dp)
+                    .pointerInput(startOfDay) {
+                        detectTapGestures(
+                            onLongPress = { offset ->
+                                val clickedMinute = if (size.height > 0) {
+                                    (offset.y / size.height.toFloat() * 1440f).toInt().coerceIn(0, 1439)
+                                } else 0
+                                val slotMillis = startOfDay + (clickedMinute * 60_000L)
+                                onTimeSlotLongClick(slotMillis)
+                            }
+                        )
+                    }
+            ) {
+                timedEvents.forEach { inst ->
                 val startCal = Calendar.getInstance().apply { timeInMillis = inst.instanceStartTime }
                 val endCal = Calendar.getInstance().apply { timeInMillis = inst.instanceEndTime }
 
@@ -948,6 +1080,7 @@ private fun DayTimelineView(
             }
         }
     }
+}
 }
 
 @Composable

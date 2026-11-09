@@ -635,16 +635,30 @@ fun EventEditSheet(
                 onClick = {
                     if (title.isBlank()) return@Button
                     val finalRrule = ParsedRrule(freq = recurrenceFreq).toRruleString()
+                    val effectiveStart = if (isAllDay) {
+                        Calendar.getInstance().apply {
+                            timeInMillis = startMillis
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                    } else startMillis
+
+                    val effectiveEnd = if (isAllDay) {
+                        effectiveStart + 86_400_000L - 1
+                    } else endMillis.coerceAtLeast(startMillis + 60_000L)
+
                     val saved = (event ?: CalendarEvent(
                         title = title.trim(),
-                        startTime = startMillis,
-                        endTime = endMillis
+                        startTime = effectiveStart,
+                        endTime = effectiveEnd
                     )).copy(
                         title = title.trim(),
                         description = description.trim(),
                         calendarId = calendarId,
-                        startTime = startMillis,
-                        endTime = endMillis,
+                        startTime = effectiveStart,
+                        endTime = effectiveEnd,
                         isAllDay = isAllDay,
                         colorHex = selectedColor,
                         rrule = finalRrule,
