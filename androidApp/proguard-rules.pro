@@ -4,6 +4,37 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
+# Koin Dependency Injection & ViewModels
+-keep class io.insert.koin.** { *; }
+-dontwarn io.insert.koin.**
+-keep class * extends androidx.lifecycle.ViewModel { *; }
+-keep class com.nool.app.ui.** { *; }
+-keep class com.nool.app.di.** { *; }
+
+# App Enums (Preserve values(), valueOf(), entries for DataStore & UI)
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+    public static **[] getEntries();
+    **[] $VALUES;
+}
+-keep enum com.nool.app.** { *; }
+-keep class com.nool.app.settings.** { *; }
+
+# SQLDelight & SQLite Index
+-keep class app.cash.sqldelight.** { *; }
+-dontwarn app.cash.sqldelight.**
+-keep class com.nool.app.db.** { *; }
+-keep class com.nool.app.domain.** { *; }
+
+# DataStore & Preferences
+-keep class androidx.datastore.** { *; }
+-dontwarn androidx.datastore.**
+
+# Compose Runtime & UI
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
 # JGit & SSH
 -keep class org.eclipse.jgit.** { *; }
 -dontwarn org.eclipse.jgit.**

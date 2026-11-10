@@ -1,11 +1,6 @@
 package com.nool.app.ui.settings
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -151,7 +146,7 @@ fun SettingsScreen(
 
     var tempTemplatesText by remember { mutableStateOf("") }
     var tempDailyNotesText by remember { mutableStateOf("") }
-    var tempFontSize by remember { mutableFloatStateOf(fontSize.toFloat()) }
+    var tempFontSize by remember(fontSize) { mutableFloatStateOf(fontSize.coerceIn(12, 24).toFloat()) }
 
     val allGroupTitles = remember {
         listOf(
@@ -659,7 +654,7 @@ fun SettingsScreen(
             title = { Text("Choose Theme") },
             text = {
                 Column {
-                    ThemeMode.values().forEach { mode ->
+                    ThemeMode.entries.forEach { mode ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -748,7 +743,7 @@ fun SettingsScreen(
             title = { Text("Default Note Layout") },
             text = {
                 Column {
-                    NoteLayoutMode.values().forEach { mode ->
+                    NoteLayoutMode.entries.forEach { mode ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -851,7 +846,7 @@ fun SettingsScreen(
             title = { Text("Default Calendar View") },
             text = {
                 Column {
-                    CalendarDefaultView.values().forEach { view ->
+                    CalendarDefaultView.entries.forEach { view ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -1130,11 +1125,7 @@ private fun SettingsGroupCard(
                 }
             }
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
+            if (isExpanded) {
                 Column(modifier = Modifier.padding(top = Dimens.Spacing8)) {
                     content()
                 }
