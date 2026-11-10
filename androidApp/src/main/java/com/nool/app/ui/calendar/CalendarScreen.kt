@@ -233,9 +233,9 @@ fun CalendarScreen(
                     .fillMaxWidth()
                     .padding(horizontal = Dimens.ScreenHorizontalMargin, vertical = Dimens.Spacing8)
             ) {
-                CalendarViewMode.values().forEachIndexed { index, mode ->
+                CalendarViewMode.entries.forEachIndexed { index, mode ->
                     SegmentedButton(
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = CalendarViewMode.values().size),
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = CalendarViewMode.entries.size),
                         onClick = { viewModel.setViewMode(mode) },
                         selected = uiState.viewMode == mode,
                         label = { Text(mode.label) }
@@ -458,7 +458,8 @@ private fun MonthGridView(
             val dayKey = dayKeyFormat.format(cal.time)
             val hasNote = existingNoteDates.contains(dayKey)
 
-            val startOfDay = cal.apply {
+            val startOfDay = Calendar.getInstance().apply {
+                timeInMillis = cal.timeInMillis
                 set(Calendar.HOUR_OF_DAY, 0)
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)

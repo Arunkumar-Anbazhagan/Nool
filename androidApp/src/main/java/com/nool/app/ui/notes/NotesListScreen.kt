@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
@@ -111,6 +112,7 @@ fun NotesListScreen(
     onNavigateToGitConflict: () -> Unit = {},
     onNavigateToGitSetup: () -> Unit = {},
     onNavigateToCalendar: () -> Unit = {},
+    onNavigateToTasks: () -> Unit = {},
     gitViewModel: GitViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -342,7 +344,7 @@ fun NotesListScreen(
                                     leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
                                     onClick = {
                                         showOverflowMenu = false
-                                        viewModel.showTasks()
+                                        onNavigateToTasks()
                                     }
                                 )
                                 DropdownMenuItem(
@@ -381,6 +383,7 @@ fun NotesListScreen(
                 FloatingPillNavDock(
                     items = listOf(
                         NavDockItem("notes", "Notes", Icons.Default.Description),
+                        NavDockItem("tasks", "Tasks", Icons.Default.CheckBox),
                         NavDockItem("calendar", "Calendar", Icons.Default.CalendarToday),
                         NavDockItem("switcher", "Switch", Icons.Default.Bolt),
                         NavDockItem("search", "Search", Icons.Default.Search),
@@ -390,6 +393,7 @@ fun NotesListScreen(
                     selectedItemId = "notes",
                     onItemSelected = { item ->
                         when (item.id) {
+                            "tasks" -> onNavigateToTasks()
                             "calendar" -> onNavigateToCalendar()
                             "switcher" -> showQuickSwitcher = true
                             "search" -> onNavigateToSearch("")

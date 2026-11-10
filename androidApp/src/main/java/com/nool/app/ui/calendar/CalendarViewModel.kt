@@ -10,6 +10,7 @@ import com.nool.app.settings.CalendarDefaultView
 import com.nool.app.settings.SettingsRepository
 import com.nool.core.model.CalendarEvent
 import com.nool.core.model.CalendarEventInstance
+import com.nool.core.model.RruleExpander
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,7 @@ class CalendarViewModel(
                     CalendarDefaultView.AGENDA -> CalendarViewMode.AGENDA
                 }
                 _uiState.update { it.copy(viewMode = mode) }
+                loadEventsForCurrentRangeInternal()
             }
         }
 
@@ -218,7 +220,16 @@ class CalendarViewModel(
         try {
             val (startRange, endRange) = calculateRangeForMode(_uiState.value.selectedDate, _uiState.value.viewMode)
             val instances = withContext(Dispatchers.IO) {
-                indexManager.getCalendarEventsInRange(startRange, endRange)
+                if (_uiState.value.viewMode == CalendarViewMode.AGENDA) {
+                    val all: List<CalendarEvent> = indexManager.getAllCalendarEvents()
+                    all.flatMap { ev: CalendarEvent -> RruleExpander.expand(ev, startRange, endRange) }.sortedBy { it.instanceStartTime }
+                } else {
+                    val inRange = indexManager.getCalendarEventsInRange(startRange, endRange)
+                    if (inRange.isEmpty()) {
+                        val all: List<CalendarEvent> = indexManager.getAllCalendarEvents()
+                        all.flatMap { ev: CalendarEvent -> RruleExpander.expand(ev, startRange, endRange) }.sortedBy { it.instanceStartTime }
+                    } else inRange
+                }
             }
             val active = _uiState.value.activeCalendars
             val filtered = instances.filter {
@@ -260,9 +271,43 @@ class CalendarViewModel(
     private fun loadNoteDates() {
         viewModelScope.launch {
             try {
-                val allNotes = withContext(Dispatchers.IO) { indexManager.getAllNotes() }
+                withContext(Dispatchers.IO) {
+                    runCatching { indexManager.syncIndex() }
+                }
+                var allNotes = withContext(Dispatchers.IO) {
+                    runCatching { indexManager.getAllNotes() }.getOrDefault(emptyList())
+                }
+                if (allNotes.isEmpty()) {
+                    val diskNotes = withContext(Dispatchers.IO) {
+                        val list = mutableListOf<IndexedNote>()
+                        val root = indexManager.vaultRoot
+                        if (root.exists()) {
+                            root.walkTopDown()
+                                .filter { it.isFile && it.name.endsWith(".md", ignoreCase = true) && !it.name.startsWith(".") && it.parentFile?.name != "attachments" }
+                                .forEach { file ->
+                                    val rel = file.relativeTo(root).path.replace('\\', '/')
+                                    list.add(
+                                        IndexedNote(
+                                            id = 0L,
+                                            relativePath = rel,
+                                            title = file.nameWithoutExtension,
+                                            folderPath = if (rel.contains('/')) rel.substringBeforeLast('/') else "",
+                                            content = "",
+                                            excerpt = "",
+                                            lastModified = file.lastModified(),
+                                            createdTimestamp = file.lastModified(),
+                                            size = file.length()
+                                        )
+                                    )
+                                }
+                        }
+                        list
+                    }
+                    if (diskNotes.isNotEmpty()) {
+                        allNotes = diskNotes
+                    }
+                }
                 val dates = allNotes.mapNotNull { note ->
-                    // Check note relative path or lastModified
                     val match = Regex("""\b(\d{4}-\d{2}-\d{2})\b""").find(note.relativePath)
                     match?.value ?: dayKeyFormat.format(Date(note.createdTimestamp.takeIf { it > 0 } ?: note.lastModified))
                 }.toSet()
@@ -277,11 +322,10 @@ class CalendarViewModel(
         val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
         return when (mode) {
             CalendarViewMode.MONTH -> {
-                // Buffer by 3 weeks before and after for smooth swipe and month boundaries
                 cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.add(Calendar.WEEK_OF_YEAR, -3)
+                cal.add(Calendar.WEEK_OF_YEAR, -4)
                 val start = cal.timeInMillis
-                cal.add(Calendar.WEEK_OF_YEAR, 10)
+                cal.add(Calendar.WEEK_OF_YEAR, 12)
                 val end = cal.timeInMillis
                 start to end
             }
@@ -306,10 +350,9 @@ class CalendarViewModel(
                 start to end
             }
             CalendarViewMode.AGENDA -> {
-                // Wide window: 1 year past to 2 years future so all upcoming & past events appear in agenda
-                cal.add(Calendar.YEAR, -1)
+                cal.add(Calendar.YEAR, -2)
                 val start = cal.timeInMillis
-                cal.add(Calendar.YEAR, 3)
+                cal.add(Calendar.YEAR, 7)
                 val end = cal.timeInMillis
                 start to end
             }

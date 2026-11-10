@@ -160,11 +160,11 @@ fun LeftSidebarDrawer(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             ) {
-                SidebarTab.values().forEachIndexed { index, tab ->
+                SidebarTab.entries.forEachIndexed { index, tab ->
                     SegmentedButton(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = SidebarTab.values().size),
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = SidebarTab.entries.size),
                         icon = {}
                     ) {
                         Icon(

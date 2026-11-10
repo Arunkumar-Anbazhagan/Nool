@@ -141,6 +141,33 @@ fun EventEditSheet(
 
     var showNotePickerDialog by remember { mutableStateOf(false) }
     var noteSearchQuery by remember { mutableStateOf("") }
+    var isSearchingNote by remember { mutableStateOf(false) }
+
+    val effectiveNotes = remember(availableNotes) {
+        if (availableNotes.isNotEmpty()) {
+            availableNotes
+        } else {
+            val vaultDir = java.io.File(context.filesDir, "vault")
+            if (vaultDir.exists()) {
+                vaultDir.walkTopDown()
+                    .filter { it.isFile && it.name.endsWith(".md", ignoreCase = true) && !it.name.startsWith(".") && it.parentFile?.name != "attachments" }
+                    .map { f ->
+                        val rel = f.relativeTo(vaultDir).path.replace('\\', '/')
+                        com.nool.core.model.IndexedNote(
+                            id = 0L,
+                            relativePath = rel,
+                            title = f.nameWithoutExtension,
+                            folderPath = if (rel.contains('/')) rel.substringBeforeLast('/') else "",
+                            content = "",
+                            excerpt = "",
+                            lastModified = f.lastModified(),
+                            createdTimestamp = f.lastModified(),
+                            size = f.length()
+                        )
+                    }.toList()
+            } else emptyList()
+        }
+    }
 
     val dateFormat = remember { SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()) }
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -473,39 +500,133 @@ fun EventEditSheet(
                     }
                 }
             } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing8),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            noteSearchQuery = ""
-                            showNotePickerDialog = true
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = noteSearchQuery,
+                        onValueChange = {
+                            noteSearchQuery = it
+                            isSearchingNote = true
                         },
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(Dimens.Spacing4))
-                        Text("Link note", maxLines = 1)
+                        placeholder = { Text("Search or autocomplete note to link...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingIcon = if (noteSearchQuery.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { noteSearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.small
+                    )
+
+                    val matchingNotes = remember(effectiveNotes, noteSearchQuery) {
+                        if (noteSearchQuery.isBlank()) {
+                            effectiveNotes.take(6)
+                        } else {
+                            effectiveNotes.filter {
+                                it.title.contains(noteSearchQuery, ignoreCase = true) ||
+                                it.relativePath.contains(noteSearchQuery, ignoreCase = true)
+                            }.take(8)
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            val effectiveTitle = if (title.isNotBlank()) title.trim() else "Event ${dateFormat.format(Date(startMillis))}"
-                            if (title.isBlank()) {
-                                title = effectiveTitle
+                    if (matchingNotes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(Dimens.Spacing4))
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 2.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(Dimens.Spacing4)) {
+                                Text(
+                                    text = if (noteSearchQuery.isBlank()) "Recent notes (tap to link):" else "Autocomplete suggestions:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = Dimens.Spacing8, vertical = Dimens.Spacing4)
+                                )
+                                matchingNotes.forEach { note ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(MaterialTheme.shapes.small)
+                                            .clickable {
+                                                linkedNotePath = note.relativePath
+                                                noteSearchQuery = ""
+                                                isSearchingNote = false
+                                            }
+                                            .padding(horizontal = Dimens.Spacing8, vertical = Dimens.Spacing8)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Description,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(Dimens.Spacing8))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = note.title.ifBlank { note.relativePath.substringAfterLast("/").removeSuffix(".md") },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = note.relativePath,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Icon(
+                                            Icons.Default.Link,
+                                            contentDescription = "Link",
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
                             }
-                            onCreateNoteForEvent?.invoke(effectiveTitle) { path ->
-                                linkedNotePath = path
-                            }
-                        },
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.weight(1f)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimens.Spacing8))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.Spacing8),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(Dimens.Spacing4))
-                        Text("Create note", maxLines = 1)
+                        OutlinedButton(
+                            onClick = { showNotePickerDialog = true },
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(Dimens.Spacing4))
+                            Text("Browse all (${effectiveNotes.size})", maxLines = 1)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                val effectiveTitle = if (title.isNotBlank()) title.trim() else "Event ${dateFormat.format(Date(startMillis))}"
+                                if (title.isBlank()) {
+                                    title = effectiveTitle
+                                }
+                                onCreateNoteForEvent?.invoke(effectiveTitle) { path ->
+                                    linkedNotePath = path
+                                }
+                            },
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(Dimens.Spacing4))
+                            Text("Create new note", maxLines = 1)
+                        }
                     }
                 }
             }
@@ -535,23 +656,23 @@ fun EventEditSheet(
                                 shape = MaterialTheme.shapes.small
                             )
                             Spacer(modifier = Modifier.height(Dimens.Spacing8))
-                            val filteredNotes = remember(availableNotes, noteSearchQuery) {
+                            val dialogFilteredNotes = remember(effectiveNotes, noteSearchQuery) {
                                 if (noteSearchQuery.isBlank()) {
-                                    availableNotes
+                                    effectiveNotes
                                 } else {
-                                    availableNotes.filter {
+                                    effectiveNotes.filter {
                                         it.title.contains(noteSearchQuery, ignoreCase = true) ||
                                         it.relativePath.contains(noteSearchQuery, ignoreCase = true)
                                     }
                                 }
                             }
-                            if (filteredNotes.isEmpty()) {
+                            if (dialogFilteredNotes.isEmpty()) {
                                 Box(
                                     modifier = Modifier.fillMaxWidth().padding(Dimens.Spacing24),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        if (availableNotes.isEmpty()) "No notes found in vault" else "No matching notes",
+                                        if (effectiveNotes.isEmpty()) "No notes found in vault" else "No matching notes",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -561,7 +682,7 @@ fun EventEditSheet(
                                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
                                     verticalArrangement = Arrangement.spacedBy(Dimens.Spacing4)
                                 ) {
-                                    items(filteredNotes, key = { it.relativePath }) { note ->
+                                    items(dialogFilteredNotes, key = { it.relativePath }) { note ->
                                         Surface(
                                             shape = MaterialTheme.shapes.small,
                                             color = MaterialTheme.colorScheme.surfaceContainerLow,

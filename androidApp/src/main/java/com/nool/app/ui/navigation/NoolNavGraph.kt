@@ -99,6 +99,20 @@ fun NoolNavGraph(
                 },
                 onNavigateToCalendar = {
                     navController.navigate(Screen.Calendar.route)
+                },
+                onNavigateToTasks = {
+                    navController.navigate(Screen.Tasks.route)
+                }
+            )
+        }
+
+        composable(route = Screen.Tasks.route) {
+            val tasksViewModel: com.nool.app.ui.tasks.TasksViewModel = koinViewModel()
+            com.nool.app.ui.tasks.TasksScreen(
+                viewModel = tasksViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenNote = { notePath ->
+                    navController.navigate(Screen.NoteDetail.createRoute(notePath))
                 }
             )
         }

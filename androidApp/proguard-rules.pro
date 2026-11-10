@@ -4,12 +4,15 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
+# Keep all Nool core models, indexing, and UI classes
+-keep class com.nool.** { *; }
+-keep interface com.nool.** { *; }
+-keep enum com.nool.** { *; }
+
 # Koin Dependency Injection & ViewModels
 -keep class io.insert.koin.** { *; }
 -dontwarn io.insert.koin.**
 -keep class * extends androidx.lifecycle.ViewModel { *; }
--keep class com.nool.app.ui.** { *; }
--keep class com.nool.app.di.** { *; }
 
 # App Enums (Preserve values(), valueOf(), entries for DataStore & UI)
 -keepclassmembers enum * {
@@ -18,14 +21,10 @@
     public static **[] getEntries();
     **[] $VALUES;
 }
--keep enum com.nool.app.** { *; }
--keep class com.nool.app.settings.** { *; }
 
 # SQLDelight & SQLite Index
 -keep class app.cash.sqldelight.** { *; }
 -dontwarn app.cash.sqldelight.**
--keep class com.nool.app.db.** { *; }
--keep class com.nool.app.domain.** { *; }
 
 # DataStore & Preferences
 -keep class androidx.datastore.** { *; }
@@ -34,6 +33,13 @@
 # Compose Runtime & UI
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
+
+# WorkManager Workers
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
 
 # JGit & SSH
 -keep class org.eclipse.jgit.** { *; }

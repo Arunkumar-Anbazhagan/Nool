@@ -163,6 +163,7 @@ val appModule = module {
     single { ShareManager(androidContext(), get()) }
     single { com.nool.app.data.templates.TemplateManager(get(), get()) }
     single { com.nool.app.data.flashcards.FlashcardManager(get()) }
+    single { com.nool.app.data.tasks.TaskManager(get(), get()) }
 
     // Git & Sync Singletons
     single { GitCredentialsStore(androidContext()) }
@@ -191,4 +192,5 @@ val appModule = module {
     viewModel { (initialNotePath: String?) -> com.nool.app.ui.graph.GraphViewModel(get(), initialNotePath) }
     viewModel { ShareViewModel(get(), get()) }
     viewModel { com.nool.app.ui.calendar.CalendarViewModel(get(), get(), get(), androidContext()) }
+    viewModel { com.nool.app.ui.tasks.TasksViewModel(get()) }
 }
