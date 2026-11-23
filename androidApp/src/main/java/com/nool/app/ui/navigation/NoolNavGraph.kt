@@ -260,7 +260,9 @@ fun NoolNavGraph(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHistory = { navController.navigate(Screen.GitHistory.route) },
-                onNavigateToConflicts = { navController.navigate(Screen.GitConflict.route) }
+                onNavigateToConflicts = { navController.navigate(Screen.GitConflict.route) },
+                onNavigateToGitSetup = { navController.navigate(Screen.GitSetup.route) },
+                onNavigateToGitSettings = { navController.navigate(Screen.GitSettings.route) }
             )
         }
 
@@ -284,7 +286,8 @@ fun NoolNavGraph(
             val viewModel: GitViewModel = koinViewModel()
             GitSettingsScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToGitSetup = { navController.navigate(Screen.GitSetup.route) }
             )
         }
     }

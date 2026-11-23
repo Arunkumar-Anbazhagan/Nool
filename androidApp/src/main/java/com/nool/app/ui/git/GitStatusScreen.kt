@@ -24,16 +24,20 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Commit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.QuestionMark
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nool.app.data.git.GitDiffEntry
@@ -73,7 +78,9 @@ fun GitStatusScreen(
     viewModel: GitViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToConflicts: () -> Unit
+    onNavigateToConflicts: () -> Unit,
+    onNavigateToGitSetup: () -> Unit = {},
+    onNavigateToGitSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -150,6 +157,26 @@ fun GitStatusScreen(
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(Icons.Default.History, contentDescription = "Commit History")
                     }
+
+                    // Sync Now Button
+                    IconButton(
+                        onClick = { viewModel.triggerSyncNow() },
+                        enabled = !uiState.isLoading && uiState.isRepo
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.Sync, contentDescription = "Sync Now")
+                        }
+                    }
+
+                    // Git Settings Button
+                    IconButton(onClick = onNavigateToGitSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Git Settings")
+                    }
                 }
             )
         },
@@ -164,31 +191,112 @@ fun GitStatusScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Commit Box
-            GroupedCardContainer(headerTitle = "Commit Changes") {
-                OutlinedTextField(
-                    value = commitMessage,
-                    onValueChange = { commitMessage = it },
-                    placeholder = { Text("Enter commit message...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    minLines = 2
-                )
+            if (!uiState.isRepo) {
+                // Not a repository state
+                GroupedCardContainer(headerTitle = "No Git Repository Connected") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Connect Your Vault to Git",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Clone an existing repository from GitHub, GitLab, Codeberg, Bitbucket, or a self-hosted Git server, or initialize a local repository for version history.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = onNavigateToGitSetup,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Clone or Initialize Repository")
+                        }
+                    }
+                }
+            } else {
+                // Active repository tools & sync overview
+                GroupedCardContainer(headerTitle = "Git Synchronization") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (uiState.remoteUrl.isNotBlank()) uiState.remoteUrl else "No remote URL configured",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                            val branchInfo = uiState.branches.firstOrNull { it.isCurrent }
+                            val syncSummary = if (branchInfo != null && (branchInfo.aheadCount > 0 || branchInfo.behindCount > 0)) {
+                                "${branchInfo.aheadCount} ahead ↑, ${branchInfo.behindCount} behind ↓"
+                            } else {
+                                "Up to date with remote"
+                            }
+                            Text(
+                                text = "Branch: $currentBranch • $syncSummary",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = { viewModel.triggerSyncNow() },
+                            enabled = !uiState.isLoading,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sync")
+                        }
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                // Commit Box
+                GroupedCardContainer(headerTitle = "Commit Changes") {
+                    OutlinedTextField(
+                        value = commitMessage,
+                        onValueChange = { commitMessage = it },
+                        placeholder = { Text("Enter commit message...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        minLines = 2
+                    )
 
-                Button(
-                    onClick = {
-                        viewModel.commitAll(commitMessage.trim())
-                        commitMessage = ""
-                    },
-                    enabled = commitMessage.isNotBlank() && !uiState.status.isClean && !uiState.isLoading,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Icon(Icons.Default.Commit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Commit All (${uiState.status.totalChanges})")
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.commitAll(commitMessage.trim())
+                            commitMessage = ""
+                        },
+                        enabled = commitMessage.isNotBlank() && !uiState.status.isClean && !uiState.isLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(Icons.Default.Commit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Commit All (${uiState.status.totalChanges})")
+                    }
                 }
             }
 

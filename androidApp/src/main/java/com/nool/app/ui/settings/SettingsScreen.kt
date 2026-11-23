@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -532,6 +533,14 @@ fun SettingsScreen(
                     isExpanded = searchQuery.isNotBlank() || expandedGroups.contains("Sync & Backup"),
                     onToggleExpand = { toggleGroup("Sync & Backup") }
                 ) {
+                    SettingsRowItem(
+                        icon = Icons.Default.CloudDownload,
+                        title = "Clone or Initialize Repository",
+                        subtitle = "Clone notes from GitHub, GitLab, Codeberg, or custom Git server",
+                        onClick = onNavigateToGitSetup
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
                     SettingsRowItem(
                         icon = Icons.Default.Sync,
                         title = "Git Repository Status",

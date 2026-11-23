@@ -2,6 +2,9 @@ name: Release APKs
 
 on:
   push:
+    branches:
+      - master
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -28,6 +31,35 @@ jobs:
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
+
+      - name: Determine Release Tag and Changelog
+        id: release_meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            DATE_STR=$(date +'%Y.%m.%d')
+            TAG_NAME="v${DATE_STR}-build.${{ github.run_number }}"
+            echo "Push to branch detected. Creating release tag: $TAG_NAME"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG_NAME" -m "Automated release $TAG_NAME on push"
+            git push origin "$TAG_NAME" || echo "Tag push skipped or already exists"
+          fi
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+          # Generate changelog from commit messages
+          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG_NAME"^ 2>/dev/null || "")
+          echo "### Changes in this Release" > /tmp/release_notes.md
+          echo "" >> /tmp/release_notes.md
+          if [ -n "$PREV_TAG" ]; then
+            echo "Commits since previous tag ($PREV_TAG):" >> /tmp/release_notes.md
+            git log "$PREV_TAG"..HEAD --pretty=format:"* %s (%h) - @%an" >> /tmp/release_notes.md
+          else
+            echo "Recent commit history:" >> /tmp/release_notes.md
+            git log -n 15 --pretty=format:"* %s (%h) - @%an" >> /tmp/release_notes.md
+          fi
+          echo "" >> /tmp/release_notes.md
 
       - name: Set up Signing Keystore
         run: |
@@ -69,9 +101,10 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: "Nool ${{ github.ref_name }}"
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          name: "Nool ${{ steps.release_meta.outputs.tag_name }}"
+          body_path: /tmp/release_notes.md
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
@@ -63,7 +64,8 @@ import com.nool.app.ui.components.expressive.PillListItem
 @Composable
 fun GitSettingsScreen(
     viewModel: GitViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToGitSetup: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -113,6 +115,28 @@ fun GitSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Repository Connection & Clone
+            GroupedCardContainer(headerTitle = "Repository Connection") {
+                Text(
+                    text = if (uiState.isRepo) {
+                        "Connected to Git repository: ${uiState.remoteUrl.ifBlank { "Local vault repository" }}"
+                    } else {
+                        "No Git repository is configured for this vault."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (uiState.isRepo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = onNavigateToGitSetup,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (uiState.isRepo) "Clone or Switch Repository" else "Clone Git Repository")
+                }
+            }
+
             // Author Identity
             GroupedCardContainer(headerTitle = "Git Identity") {
                 OutlinedTextField(

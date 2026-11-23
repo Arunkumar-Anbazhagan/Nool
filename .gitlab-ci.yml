@@ -1,0 +1,89 @@
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+default:
+  image: eclipse-temurin:17-jdk
+
+before_script:
+  - export GRADLE_USER_HOME=$(pwd)/.gradle
+  - chmod +x gradlew
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+
+test:
+  stage: test
+  script:
+    - ./gradlew testDebugUnitTest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+
+build-apk:
+  stage: build
+  script:
+    - |
+      if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+        echo "Decoding production keystore..."
+        echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+        export KEYSTORE_FILE=/tmp/release.keystore
+      else
+        echo "Generating CI self-signed keystore..."
+        mkdir -p /tmp/keystore
+        keytool -genkeypair -v \
+          -keystore /tmp/keystore/ci-release.keystore \
+          -alias ci-key \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -storepass android \
+          -keypass android \
+          -dname "CN=Nool CI, OU=Engineering, O=Nool, L=Global, S=Global, C=US"
+        export KEYSTORE_FILE=/tmp/keystore/ci-release.keystore
+        export KEYSTORE_PASSWORD=android
+        export KEY_ALIAS=ci-key
+        export KEY_PASSWORD=android
+      fi
+    - ./gradlew assembleRelease
+  artifacts:
+    name: "nool-apks-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - androidApp/build/outputs/apk/release/*.apk
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG
+
+publish-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build-apk
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"
+      variables:
+        RELEASE_TAG: "v1.0.${CI_PIPELINE_IID}"
+    - if: $CI_COMMIT_TAG
+      variables:
+        RELEASE_TAG: "$CI_COMMIT_TAG"
+  script:
+    - echo "Publishing release $RELEASE_TAG for $CI_COMMIT_SHA"
+  release:
+    name: "Nool $RELEASE_TAG"
+    tag_name: "$RELEASE_TAG"
+    description: |
+      ## Nool Release $RELEASE_TAG
+      Automatically generated on push to `$CI_COMMIT_REF_NAME` (commit `$CI_COMMIT_SHORT_SHA`).
+
+      ### Changes
+      $CI_COMMIT_TITLE
+
+      ### Artifacts
+      APK binaries are attached to this job and release assets.

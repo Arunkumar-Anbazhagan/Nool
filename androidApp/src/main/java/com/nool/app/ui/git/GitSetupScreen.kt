@@ -23,9 +23,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
@@ -64,7 +66,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,6 +80,57 @@ import com.nool.app.ui.components.expressive.SegmentedButtonRow
 import com.nool.app.ui.components.expressive.SegmentedItem
 import kotlinx.coroutines.launch
 
+enum class GitProvider(
+    val label: String,
+    val defaultUrlPrefix: String,
+    val defaultUser: String,
+    val tokenHint: String,
+    val sshHint: String
+) {
+    GITHUB(
+        label = "GitHub",
+        defaultUrlPrefix = "https://github.com/",
+        defaultUser = "token",
+        tokenHint = "Create a Personal Access Token in GitHub > Settings > Developer settings > Personal access tokens with 'repo' scope.",
+        sshHint = "Add your SSH key to GitHub > Settings > SSH and GPG keys > New SSH key."
+    ),
+    GITLAB(
+        label = "GitLab",
+        defaultUrlPrefix = "https://gitlab.com/",
+        defaultUser = "oauth2",
+        tokenHint = "Create a Personal Access Token in GitLab > User Settings > Access Tokens with 'read_repository' and 'write_repository' scopes.",
+        sshHint = "Add your SSH key to GitLab > User Settings / Preferences > SSH Keys."
+    ),
+    CODEBERG(
+        label = "Codeberg",
+        defaultUrlPrefix = "https://codeberg.org/",
+        defaultUser = "token",
+        tokenHint = "Create a Personal Access Token in Codeberg > Settings > Applications with 'repo' scope.",
+        sshHint = "Add your SSH key to Codeberg > Settings > SSH / GPG Keys."
+    ),
+    GITEA(
+        label = "Gitea / Forgejo",
+        defaultUrlPrefix = "https://",
+        defaultUser = "token",
+        tokenHint = "Create an Access Token in your Gitea/Forgejo User Settings > Applications with repository scope.",
+        sshHint = "Add your SSH key to your Gitea/Forgejo Settings > SSH / GPG Keys."
+    ),
+    BITBUCKET(
+        label = "Bitbucket",
+        defaultUrlPrefix = "https://bitbucket.org/",
+        defaultUser = "",
+        tokenHint = "Enter your Bitbucket username and generate an App Password in Personal Settings > App Passwords with 'repository:read' and 'repository:write'.",
+        sshHint = "Add your SSH key to Bitbucket > Personal Settings > SSH Keys > Add key."
+    ),
+    CUSTOM(
+        label = "Custom Server",
+        defaultUrlPrefix = "",
+        defaultUser = "token",
+        tokenHint = "Enter your username and personal access token, deploy token, or password for your self-hosted Git server.",
+        sshHint = "Add your SSH key to your Git server or ~/.ssh/authorized_keys."
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun GitSetupScreen(
@@ -86,6 +141,7 @@ fun GitSetupScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
 
     var selectedMode by remember { mutableIntStateOf(0) } // 0: Clone, 1: Initialize
     var remoteUrl by remember { mutableStateOf(uiState.remoteUrl) }
@@ -93,6 +149,16 @@ fun GitSetupScreen(
     var authType by remember { mutableStateOf(uiState.authType) }
     var token by remember { mutableStateOf("") }
     var tokenUser by remember { mutableStateOf("token") }
+    var selectedProvider by remember {
+        val detected = when {
+            uiState.remoteUrl.contains("gitlab.com") -> GitProvider.GITLAB
+            uiState.remoteUrl.contains("codeberg.org") -> GitProvider.CODEBERG
+            uiState.remoteUrl.contains("bitbucket.org") -> GitProvider.BITBUCKET
+            uiState.remoteUrl.isNotBlank() && !uiState.remoteUrl.contains("github.com") -> GitProvider.CUSTOM
+            else -> GitProvider.GITHUB
+        }
+        mutableStateOf(detected)
+    }
 
     // Dialog state for non-empty folders
     var showNonEmptyDialog by remember { mutableStateOf(false) }
@@ -201,6 +267,38 @@ fun GitSetupScreen(
             if (selectedMode == 0) {
                 // Clone from remote
                 GroupedCardContainer(headerTitle = "Remote Repository") {
+                    Text(
+                        text = "Git Hosting Provider",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GitProvider.entries.forEach { provider ->
+                            FilterChip(
+                                selected = selectedProvider == provider,
+                                onClick = {
+                                    selectedProvider = provider
+                                    if (provider.defaultUrlPrefix.isNotBlank() && (remoteUrl.isBlank() || GitProvider.entries.any { it.defaultUrlPrefix.isNotBlank() && remoteUrl == it.defaultUrlPrefix })) {
+                                        remoteUrl = provider.defaultUrlPrefix
+                                    }
+                                    if (provider.defaultUser.isNotBlank() || provider == GitProvider.BITBUCKET) {
+                                        tokenUser = provider.defaultUser
+                                    }
+                                },
+                                label = { Text(provider.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     OutlinedTextField(
                         value = remoteUrl,
                         onValueChange = {
@@ -210,7 +308,18 @@ fun GitSetupScreen(
                             }
                         },
                         label = { Text("Repository URL") },
-                        placeholder = { Text("https://github.com/user/notes.git") },
+                        placeholder = {
+                            Text(
+                                when (selectedProvider) {
+                                    GitProvider.GITHUB -> "https://github.com/user/notes.git"
+                                    GitProvider.GITLAB -> "https://gitlab.com/user/notes.git"
+                                    GitProvider.CODEBERG -> "https://codeberg.org/user/notes.git"
+                                    GitProvider.GITEA -> "https://gitea.example.com/user/notes.git"
+                                    GitProvider.BITBUCKET -> "https://bitbucket.org/user/notes.git"
+                                    GitProvider.CUSTOM -> "https://git.server.com/user/notes.git or git@host:repo.git"
+                                }
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp)
@@ -302,13 +411,54 @@ fun GitSetupScreen(
                     if (authType == "HTTPS") {
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
-                            value = token,
-                            onValueChange = { token = it },
-                            label = { Text("Personal Access Token (PAT)") },
+                            value = tokenUser,
+                            onValueChange = { tokenUser = it },
+                            label = { Text("Username") },
+                            placeholder = {
+                                Text(
+                                    when (selectedProvider) {
+                                        GitProvider.GITLAB -> "oauth2 or GitLab username"
+                                        GitProvider.BITBUCKET -> "Bitbucket Username"
+                                        else -> "token or username"
+                                    }
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp)
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = token,
+                            onValueChange = { token = it },
+                            label = { Text(if (selectedProvider == GitProvider.BITBUCKET) "App Password" else "Personal Access Token (PAT)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = selectedProvider.tokenHint,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     } else if (authType == "SSH") {
                         Spacer(modifier = Modifier.height(12.dp))
                         if (uiState.sshPublicKey.isBlank()) {
@@ -316,14 +466,72 @@ fun GitSetupScreen(
                                 onClick = { viewModel.generateSshKey() },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
+                                Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text("Generate Ed25519 SSH Keypair")
                             }
                         } else {
                             Text(
-                                text = "Public Key: ${uiState.sshPublicKey.take(35)}...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Ed25519 Public Key:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = uiState.sshPublicKey,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 4
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(uiState.sshPublicKey))
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("SSH Public Key copied to clipboard")
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Copy Key")
+                                }
+                                Button(
+                                    onClick = { viewModel.generateSshKey() },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Regenerate")
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = selectedProvider.sshHint,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }

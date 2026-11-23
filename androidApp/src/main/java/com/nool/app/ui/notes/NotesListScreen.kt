@@ -197,7 +197,11 @@ fun NotesListScreen(
                     },
                     onNavigateToGit = {
                         scope.launch { drawerState.close() }
-                        onNavigateToGitStatus()
+                        if (gitUiState.isRepo) {
+                            onNavigateToGitStatus()
+                        } else {
+                            onNavigateToGitSetup()
+                        }
                     }
                 )
             }
